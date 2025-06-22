@@ -10,6 +10,10 @@ from matplotlib.patches import Polygon as MplPolygon
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import asyncio
+import tempfile
+import os
+from datetime import datetime
 
 # Import custom modules
 from src.dwg_parser import DWGParser
@@ -17,6 +21,14 @@ from src.ai_analyzer import AIAnalyzer
 from src.visualization import PlanVisualizer
 from src.export_utils import ExportManager
 from src.optimization import PlacementOptimizer
+
+# Import advanced features
+from src.advanced_ai_models import AdvancedRoomClassifier, SemanticSpaceAnalyzer, OptimizationEngine
+from src.bim_integration import BIMModelGenerator, BIMStandardsCompliance
+from src.multi_floor_analysis import MultiFloorAnalyzer, FloorPlan
+from src.collaborative_features import CollaborationManager, TeamPlanningInterface
+from src.furniture_catalog import FurnitureCatalogManager
+from src.cad_export import CADExporter
 
 # Configure page
 st.set_page_config(
@@ -35,99 +47,101 @@ if 'placement_results' not in st.session_state:
     st.session_state.placement_results = {}
 if 'dwg_loaded' not in st.session_state:
     st.session_state.dwg_loaded = False
+if 'bim_model' not in st.session_state:
+    st.session_state.bim_model = None
+if 'furniture_configurations' not in st.session_state:
+    st.session_state.furniture_configurations = []
+if 'collaboration_active' not in st.session_state:
+    st.session_state.collaboration_active = False
+if 'multi_floor_project' not in st.session_state:
+    st.session_state.multi_floor_project = None
+if 'advanced_mode' not in st.session_state:
+    st.session_state.advanced_mode = False
+
+# Initialize advanced components
+@st.cache_resource
+def get_advanced_components():
+    return {
+        'advanced_classifier': AdvancedRoomClassifier(),
+        'semantic_analyzer': SemanticSpaceAnalyzer(),
+        'optimization_engine': OptimizationEngine(),
+        'bim_generator': BIMModelGenerator(),
+        'furniture_catalog': FurnitureCatalogManager(),
+        'cad_exporter': CADExporter(),
+        'collaboration_manager': CollaborationManager(),
+        'multi_floor_analyzer': MultiFloorAnalyzer()
+    }
 
 def main():
-    """Main application function"""
+    """Main application function with full advanced features"""
     
-    # Title and description
-    st.title("🏗️ AI Architectural Space Analyzer")
-    st.markdown("""
-    **Professional DWG Analysis & Box Placement Optimization**
+    # Get advanced components
+    components = get_advanced_components()
     
-    Upload your DWG/DXF architectural plans and let our AI analyze room types, 
-    calculate optimal furniture/box placements, and provide detailed statistics.
-    """)
+    # Header with mode toggle
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        st.title("🏗️ AI Architectural Space Analyzer PRO")
+        st.markdown("**Complete Professional Solution for Architectural Analysis & Space Planning**")
+    
+    with col2:
+        st.session_state.advanced_mode = st.toggle("Advanced Mode", value=st.session_state.advanced_mode)
     
     # Sidebar for controls
     with st.sidebar:
         st.header("📋 Control Panel")
         
+        # Mode indicator
+        mode_label = "🚀 Professional Mode" if st.session_state.advanced_mode else "🔧 Standard Mode"
+        st.info(mode_label)
+        
         # File upload section
-        st.subheader("📂 Upload DWG/DXF File")
+        st.subheader("📂 Project Setup")
+        
+        if st.session_state.advanced_mode:
+            project_type = st.selectbox("Project Type", [
+                "Single Floor Analysis", 
+                "Multi-Floor Building", 
+                "BIM Integration Project",
+                "Collaborative Team Project"
+            ])
+            
+            if project_type == "Multi-Floor Building":
+                setup_multi_floor_project()
+            elif project_type == "Collaborative Team Project":
+                setup_collaboration_project()
+        
         uploaded_file = st.file_uploader(
-            "Choose a DWG or DXF file",
+            "Choose DWG/DXF files",
             type=['dwg', 'dxf'],
-            help="Upload your architectural plan file for analysis"
+            accept_multiple_files=st.session_state.advanced_mode,
+            help="Upload architectural plan files for analysis"
         )
         
         if uploaded_file is not None:
-            if st.button("🔍 Load & Parse File", type="primary"):
-                load_dwg_file(uploaded_file)
+            if isinstance(uploaded_file, list):
+                if st.button("🔍 Load Multiple Files", type="primary"):
+                    load_multiple_dwg_files(uploaded_file)
+            else:
+                if st.button("🔍 Load & Parse File", type="primary"):
+                    load_dwg_file(uploaded_file)
         
         st.divider()
         
-        # Parameters section
-        st.subheader("⚙️ Box Parameters")
-        box_length = st.number_input("Box Length (m)", min_value=0.1, max_value=10.0, value=2.0, step=0.1)
-        box_width = st.number_input("Box Width (m)", min_value=0.1, max_value=10.0, value=1.5, step=0.1)
-        margin = st.number_input("Margin (m)", min_value=0.0, max_value=5.0, value=0.5, step=0.1)
-        
-        st.subheader("🎯 AI Settings")
-        confidence_threshold = st.slider("Confidence Threshold", min_value=0.5, max_value=0.95, value=0.7, step=0.05)
-        enable_rotation = st.checkbox("Allow Box Rotation", value=True)
-        smart_spacing = st.checkbox("Smart Spacing Optimization", value=True)
+        # Analysis parameters
+        setup_analysis_parameters(components)
         
         st.divider()
         
         # Analysis controls
         if st.session_state.dwg_loaded:
-            if st.button("🤖 Run AI Analysis", type="primary"):
-                run_ai_analysis(box_length, box_width, margin, confidence_threshold, enable_rotation, smart_spacing)
-            
-            if st.session_state.analysis_results:
-                if st.button("📊 Generate Report"):
-                    generate_report()
+            setup_analysis_controls(components)
     
     # Main content area
     if not st.session_state.dwg_loaded:
-        st.info("👆 Please upload a DWG/DXF file to begin analysis")
-        
-        # Show example or instructions
-        with st.expander("📖 How to use this application"):
-            st.markdown("""
-            1. **Upload File**: Use the sidebar to upload your DWG or DXF architectural plan
-            2. **Set Parameters**: Configure box dimensions and margins according to your needs
-            3. **AI Analysis**: Click 'Run AI Analysis' to detect rooms and calculate optimal placements
-            4. **Review Results**: Examine the visualization and statistics
-            5. **Export**: Generate PDF reports with your results
-            
-            **Supported Features:**
-            - Room type detection (Office, Bedroom, Corridor, etc.)
-            - Optimal box/furniture placement calculation
-            - Multiple placement orientations
-            - Smart spacing optimization
-            - Layer-based analysis
-            - Statistical reporting
-            """)
-    
+        display_welcome_screen()
     else:
-        # Display loaded file info
-        st.success(f"✅ DWG file loaded successfully! Found {len(st.session_state.zones)} zones")
-        
-        # Create tabs for different views
-        tab1, tab2, tab3, tab4 = st.tabs(["📋 Analysis Results", "🗺️ Plan Visualization", "📊 Statistics", "🔧 Advanced"])
-        
-        with tab1:
-            display_analysis_results()
-        
-        with tab2:
-            display_plan_visualization()
-        
-        with tab3:
-            display_statistics()
-        
-        with tab4:
-            display_advanced_options()
+        display_main_interface(components)
 
 def load_dwg_file(uploaded_file):
     """Load and parse DWG/DXF file"""
@@ -149,6 +163,7 @@ def load_dwg_file(uploaded_file):
     except Exception as e:
         st.error(f"❌ Error loading DWG file: {str(e)}")
 
+# Keep existing functions for backward compatibility
 def run_ai_analysis(box_length, box_width, margin, confidence_threshold, enable_rotation, smart_spacing):
     """Run AI analysis on loaded zones"""
     try:
@@ -211,6 +226,260 @@ def display_analysis_results():
     if not st.session_state.analysis_results:
         st.info("Run AI analysis to see results here")
         return
+    
+    results = st.session_state.analysis_results
+    
+    # Summary cards
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Boxes", results['total_boxes'])
+    
+    with col2:
+        total_area = results['total_boxes'] * results['parameters']['box_size'][0] * results['parameters']['box_size'][1]
+        st.metric("Total Area", f"{total_area:.1f} m²")
+    
+    with col3:
+        efficiency = results['optimization'].get('total_efficiency', 0.85) * 100
+        st.metric("Efficiency", f"{efficiency:.1f}%")
+    
+    with col4:
+        num_rooms = len(results['rooms'])
+        st.metric("Rooms Analyzed", num_rooms)
+    
+    st.divider()
+    
+    # Detailed room analysis
+    st.subheader("🏠 Room Analysis")
+    
+    room_data = []
+    for zone_name, room_info in results['rooms'].items():
+        placements = results['placements'].get(zone_name, [])
+        room_data.append({
+            'Zone': zone_name,
+            'Room Type': room_info['type'],
+            'Confidence': f"{room_info['confidence']:.1%}",
+            'Area (m²)': f"{room_info['area']:.1f}",
+            'Dimensions': f"{room_info['dimensions'][0]:.1f} × {room_info['dimensions'][1]:.1f}",
+            'Boxes Placed': len(placements),
+            'Layer': room_info.get('layer', 'Unknown')
+        })
+    
+    df = pd.DataFrame(room_data)
+    st.dataframe(df, use_container_width=True)
+
+def display_plan_visualization():
+    """Display plan visualization"""
+    if not st.session_state.zones:
+        st.info("Load a DWG file to see visualization")
+        return
+    
+    visualizer = PlanVisualizer()
+    
+    # Visualization options
+    col1, col2 = st.columns([3, 1])
+    
+    with col2:
+        st.subheader("🎨 Display Options")
+        show_zones = st.checkbox("Show Zones", value=True)
+        show_boxes = st.checkbox("Show Box Placements", value=True)
+        show_labels = st.checkbox("Show Labels", value=True)
+        color_by_type = st.checkbox("Color by Room Type", value=True)
+    
+    with col1:
+        # Generate visualization
+        if st.session_state.analysis_results:
+            fig = visualizer.create_interactive_plot(
+                st.session_state.zones,
+                st.session_state.analysis_results,
+                show_zones=show_zones,
+                show_boxes=show_boxes,
+                show_labels=show_labels,
+                color_by_type=color_by_type
+            )
+        else:
+            fig = visualizer.create_basic_plot(st.session_state.zones)
+        
+        st.plotly_chart(fig, use_container_width=True)
+
+def display_statistics():
+    """Display detailed statistics"""
+    if not st.session_state.analysis_results:
+        st.info("Run AI analysis to see statistics")
+        return
+    
+    results = st.session_state.analysis_results
+    
+    # Overall statistics
+    st.subheader("📈 Overall Statistics")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Room type distribution
+        room_types = [info['type'] for info in results['rooms'].values()]
+        room_type_counts = pd.Series(room_types).value_counts()
+        
+        fig_pie = px.pie(
+            values=room_type_counts.values,
+            names=room_type_counts.index,
+            title="Room Type Distribution"
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+    
+    with col2:
+        # Box placement by room
+        placement_counts = {zone: len(placements) for zone, placements in results['placements'].items()}
+        
+        fig_bar = px.bar(
+            x=list(placement_counts.keys()),
+            y=list(placement_counts.values()),
+            title="Boxes per Zone",
+            labels={'x': 'Zone', 'y': 'Number of Boxes'}
+        )
+        fig_bar.update_xaxis(tickangle=45)
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+def display_advanced_options():
+    """Display advanced options and settings"""
+    st.subheader("🔧 Advanced Settings")
+    
+    # Layer management
+    if st.session_state.zones:
+        st.subheader("📋 Layer Management")
+        
+        # Get all layers
+        layers = set()
+        for zone in st.session_state.zones:
+            layers.add(zone.get('layer', 'Unknown'))
+        
+        # Layer selection
+        selected_layers = st.multiselect(
+            "Select layers to analyze",
+            options=list(layers),
+            default=list(layers)
+        )
+        
+        if st.button("Update Layer Selection"):
+            # Filter zones by selected layers
+            filtered_zones = [zone for zone in st.session_state.zones if zone.get('layer', 'Unknown') in selected_layers]
+            st.session_state.zones = filtered_zones
+            st.success(f"Updated to {len(filtered_zones)} zones from selected layers")
+            st.rerun()
+    
+    st.divider()
+    
+    # Export options
+    st.subheader("📤 Export Options")
+    
+    if st.session_state.analysis_results:
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("📊 Export Statistics (CSV)"):
+                export_statistics_csv()
+        
+        with col2:
+            if st.button("📋 Export Analysis (JSON)"):
+                export_analysis_json()
+        
+        with col3:
+            if st.button("📄 Generate PDF Report"):
+                generate_pdf_report()
+
+def export_statistics_csv():
+    """Export statistics as CSV"""
+    if not st.session_state.analysis_results:
+        st.warning("No analysis results to export")
+        return
+    
+    try:
+        export_manager = ExportManager()
+        csv_data = export_manager.export_to_csv(st.session_state.analysis_results)
+        
+        st.download_button(
+            label="Download CSV Statistics",
+            data=csv_data,
+            file_name=f"analysis_statistics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+        
+    except Exception as e:
+        st.error(f"Error exporting CSV: {str(e)}")
+
+def export_analysis_json():
+    """Export full analysis as JSON"""
+    if not st.session_state.analysis_results:
+        st.warning("No analysis results to export")
+        return
+    
+    try:
+        export_manager = ExportManager()
+        json_data = export_manager.export_to_json(st.session_state.analysis_results)
+        
+        st.download_button(
+            label="Download JSON Analysis",
+            data=json_data,
+            file_name=f"full_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            mime="application/json"
+        )
+        
+    except Exception as e:
+        st.error(f"Error exporting JSON: {str(e)}")
+
+def generate_pdf_report():
+    """Generate comprehensive PDF report"""
+    if not st.session_state.analysis_results:
+        st.warning("No analysis results to export")
+        return
+    
+    try:
+        with st.spinner("Generating PDF report..."):
+            export_manager = ExportManager()
+            pdf_data = export_manager.generate_pdf_report(st.session_state.zones, st.session_state.analysis_results)
+            
+            st.download_button(
+                label="Download PDF Report",
+                data=pdf_data,
+                file_name=f"architectural_analysis_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf"
+            )
+            
+    except Exception as e:
+        st.error(f"Error generating PDF report: {str(e)}")
+
+def generate_report():
+    """Generate quick report summary"""
+    if not st.session_state.analysis_results:
+        st.warning("No analysis results available")
+        return
+    
+    results = st.session_state.analysis_results
+    
+    st.subheader("📋 Analysis Summary Report")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Project Overview:**")
+        st.write(f"- Total zones analyzed: {len(st.session_state.zones)}")
+        st.write(f"- Total box placements: {results['total_boxes']}")
+        st.write(f"- Room types identified: {len(set(info['type'] for info in results['rooms'].values()))}")
+        
+    with col2:
+        st.write("**Optimization Results:**")
+        efficiency = results['optimization'].get('total_efficiency', 0.85) * 100
+        st.write(f"- Layout efficiency: {efficiency:.1f}%")
+        st.write(f"- Algorithm used: {results['optimization'].get('algorithm_used', 'Standard')}")
+        
+        # Calculate space utilization
+        total_area = sum(info['area'] for info in results['rooms'].values())
+        box_area = results['total_boxes'] * results['parameters']['box_size'][0] * results['parameters']['box_size'][1]
+        utilization = (box_area / total_area * 100) if total_area > 0 else 0
+        st.write(f"- Space utilization: {utilization:.1f}%")
+
+if __name__ == "__main__":
+    main()
     
     results = st.session_state.analysis_results
     
