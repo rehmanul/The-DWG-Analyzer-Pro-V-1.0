@@ -1425,8 +1425,11 @@ def generate_report():
         utilization = (box_area / total_area * 100) if total_area > 0 else 0
         st.write(f"- Space utilization: {utilization:.1f}%")
 
-if __name__ == "__main__":
-    main()
+def display_analysis_results():
+    """Display analysis results"""
+    if not st.session_state.analysis_results:
+        st.info("Run analysis to see results")
+        return
     
     results = st.session_state.analysis_results
     
