@@ -34,8 +34,13 @@ class DWGParser:
             temp_file_path = temp_file.name
         
         try:
-            # Read the DXF/DWG file
-            doc = ezdxf.readfile(temp_file_path)
+            # Try to read the DXF/DWG file
+            try:
+                doc = ezdxf.readfile(temp_file_path)
+            except ezdxf.DXFStructureError:
+                # Try with recovery mode for corrupted files
+                doc = ezdxf.recover.readfile(temp_file_path)
+            
             modelspace = doc.modelspace()
             
             # Extract layers information

@@ -978,7 +978,7 @@ def main():
             "Choose DWG/DXF files",
             type=['dwg', 'dxf'],
             accept_multiple_files=st.session_state.advanced_mode,
-            help="Upload architectural plan files for analysis (Max 50MB per file)"
+            help="Upload architectural plan files for analysis (Max 200MB per file)"
         )
         
         if uploaded_file is not None:
@@ -998,7 +998,10 @@ def main():
                     st.write(f"Size: {file_size_mb:.1f} MB")
                     
                     if st.button("Load & Parse File", type="primary"):
-                        load_dwg_file(uploaded_file)
+                        if file_size_mb > 200:
+                            st.error("File too large. Maximum size is 200MB.")
+                        else:
+                            load_dwg_file(uploaded_file)
             except Exception as e:
                 st.error(f"File handling error: {str(e)}")
         
@@ -1092,12 +1095,26 @@ def load_dwg_file(uploaded_file):
     """Load and parse DWG/DXF file"""
     try:
         with st.spinner("🔄 Loading and parsing DWG file..."):
+            # Check file size
+            file_size = uploaded_file.size
+            if file_size > 200 * 1024 * 1024:  # 200MB limit
+                st.error("File too large. Please use a file smaller than 200MB.")
+                return
+            
             # Save uploaded file temporarily
             file_bytes = uploaded_file.read()
+            
+            if len(file_bytes) == 0:
+                st.error("File appears to be empty or corrupted.")
+                return
             
             # Parse the DWG/DXF file
             parser = DWGParser()
             zones = parser.parse_file(file_bytes, uploaded_file.name)
+            
+            if not zones:
+                st.warning("No valid zones found in the file. Please check if the file contains closed polygons or room boundaries.")
+                return
             
             st.session_state.zones = zones
             st.session_state.dwg_loaded = True
@@ -1105,8 +1122,18 @@ def load_dwg_file(uploaded_file):
             st.success(f"✅ Successfully loaded {len(zones)} zones from {uploaded_file.name}")
             st.rerun()
             
+    except PermissionError:
+        st.error("❌ Permission denied. Please try uploading the file again.")
     except Exception as e:
-        st.error(f"❌ Error loading DWG file: {str(e)}")
+        error_msg = str(e)
+        if "403" in error_msg or "Forbidden" in error_msg:
+            st.error("❌ Upload forbidden. The file might be too large or in an unsupported format. Try a smaller DWG/DXF file.")
+        elif "400" in error_msg or "Bad Request" in error_msg:
+            st.error("❌ Bad request. Please ensure the file is a valid DWG or DXF file.")
+        else:
+            st.error(f"❌ Error loading DWG file: {error_msg}")
+        
+        st.info("💡 Try these solutions:\n- Use a smaller file (under 200MB)\n- Ensure the file is a valid DWG/DXF format\n- Try refreshing the page and uploading again")
 
 # Keep existing functions for backward compatibility
 def run_ai_analysis(box_length, box_width, margin, confidence_threshold, enable_rotation, smart_spacing):
