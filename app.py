@@ -22,8 +22,9 @@ from src.visualization import PlanVisualizer
 from src.export_utils import ExportManager
 from src.optimization import PlacementOptimizer
 
-# Import database
+# Import database and AI
 from src.database import DatabaseManager
+from src.ai_integration import GeminiAIAnalyzer
 
 # Import advanced features with fallbacks
 try:
@@ -105,7 +106,8 @@ def get_advanced_components():
         'cad_exporter': CADExporter(),
         'collaboration_manager': CollaborationManager(),
         'multi_floor_analyzer': MultiFloorAnalyzer(),
-        'database': DatabaseManager()
+        'database': DatabaseManager(),
+        'ai_analyzer': GeminiAIAnalyzer()
     }
 
 def setup_multi_floor_project():
@@ -667,8 +669,19 @@ def run_advanced_analysis(components):
             status_text.text("Advanced room classification...")
             progress_bar.progress(20)
             
-            advanced_classifier = components['advanced_classifier']
-            room_analysis = advanced_classifier.batch_classify(st.session_state.zones)
+            # Use Gemini AI for room classification
+            ai_analyzer = components['ai_analyzer']
+            room_analysis = {}
+            
+            for i, zone in enumerate(st.session_state.zones):
+                zone_name = f"Zone_{i}"
+                ai_result = ai_analyzer.analyze_room_type(zone)
+                room_analysis[zone_name] = {
+                    'type': ai_result['type'],
+                    'confidence': ai_result['confidence'],
+                    'area': zone.get('area', 0),
+                    'reasoning': ai_result['reasoning']
+                }
             
             # Step 2: Semantic space analysis
             status_text.text("Semantic space analysis...")
@@ -694,8 +707,8 @@ def run_advanced_analysis(components):
             }
             placement_analysis = analyzer.analyze_furniture_placement(st.session_state.zones, params)
             
-            # Advanced optimization
-            optimization_results = optimization_engine.optimize_layout(st.session_state.zones, params)
+            # Use Gemini AI for optimization
+            optimization_results = ai_analyzer.optimize_furniture_placement(st.session_state.zones, params)
             
             # Step 4: Save to database
             status_text.text("Saving to database...")
@@ -731,7 +744,7 @@ def run_advanced_analysis(components):
             progress_bar.empty()
             status_text.empty()
             
-            st.success(f"Advanced analysis complete! Analyzed {len(st.session_state.zones)} zones with {results['total_boxes']} optimal placements")
+            st.success(f"Advanced analysis complete! Analyzed {len(st.session_state.zones)} zones with {results.get('total_boxes', 0)} optimal placements")
             st.rerun()
             
     except Exception as e:
@@ -988,7 +1001,7 @@ def display_advanced_statistics(components):
     # Room type distribution
     if 'rooms' in results:
         room_types = {}
-        for info in results['rooms'].values():
+        for info in results.get('rooms', {}).values():
             room_type = info.get('type', 'Unknown')
             room_types[room_type] = room_types.get(room_type, 0) + 1
         
@@ -1004,8 +1017,8 @@ def display_advanced_statistics(components):
         with col2:
             st.subheader("Space Utilization")
             if 'total_boxes' in results:
-                box_area = results['total_boxes'] * 3.0  # Estimate
-                total_area = sum(info['area'] for info in results['rooms'].values())
+                box_area = results.get('total_boxes', 0) * 3.0  # Estimate
+                total_area = sum(info['area'] for info in results.get('rooms', {}).values())
                 utilization = (box_area / total_area * 100) if total_area > 0 else 0
                 
                 fig = go.Figure(go.Indicator(
@@ -1093,7 +1106,7 @@ def run_ai_analysis(box_length, box_width, margin, confidence_threshold, enable_
             progress_bar.empty()
             status_text.empty()
             
-            st.success(f"✅ AI analysis complete! Found {st.session_state.analysis_results['total_boxes']} optimal box placements")
+            st.success(f"✅ AI analysis complete! Found {st.session_state.analysis_results.get('total_boxes', 0)} optimal box placements")
             st.rerun()
             
     except Exception as e:
@@ -1111,18 +1124,18 @@ def display_analysis_results():
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Total Boxes", results['total_boxes'])
+        st.metric("Total Boxes", results.get('total_boxes', 0))
     
     with col2:
-        total_area = results['total_boxes'] * results['parameters']['box_size'][0] * results['parameters']['box_size'][1]
+        total_area = results.get('total_boxes', 0) * results.get('parameters', {})['box_size'][0] * results.get('parameters', {})['box_size'][1]
         st.metric("Total Area", f"{total_area:.1f} m²")
     
     with col3:
-        efficiency = results['optimization'].get('total_efficiency', 0.85) * 100
+        efficiency = results.get('optimization', {}).get('total_efficiency', 0.85) * 100
         st.metric("Efficiency", f"{efficiency:.1f}%")
     
     with col4:
-        num_rooms = len(results['rooms'])
+        num_rooms = len(results.get('rooms', {}))
         st.metric("Rooms Analyzed", num_rooms)
     
     st.divider()
@@ -1131,7 +1144,7 @@ def display_analysis_results():
     st.subheader("🏠 Room Analysis")
     
     room_data = []
-    for zone_name, room_info in results['rooms'].items():
+    for zone_name, room_info in results.get('rooms', {}).items():
         placements = results['placements'].get(zone_name, [])
         room_data.append({
             'Zone': zone_name,
@@ -1195,7 +1208,7 @@ def display_statistics():
     
     with col1:
         # Room type distribution
-        room_types = [info['type'] for info in results['rooms'].values()]
+        room_types = [info['type'] for info in results.get('rooms', {}).values()]
         room_type_counts = pd.Series(room_types).value_counts()
         
         fig_pie = px.pie(
@@ -1341,18 +1354,20 @@ def generate_report():
     with col1:
         st.write("**Project Overview:**")
         st.write(f"- Total zones analyzed: {len(st.session_state.zones)}")
-        st.write(f"- Total box placements: {results['total_boxes']}")
-        st.write(f"- Room types identified: {len(set(info['type'] for info in results['rooms'].values()))}")
+        st.write(f"- Total box placements: {results.get('total_boxes', 0)}")
+        st.write(f"- Room types identified: {len(set(info['type'] for info in results.get('rooms', {}).values()))}")
         
     with col2:
         st.write("**Optimization Results:**")
-        efficiency = results['optimization'].get('total_efficiency', 0.85) * 100
+        efficiency = results.get('optimization', {}).get('total_efficiency', 0.85) * 100
         st.write(f"- Layout efficiency: {efficiency:.1f}%")
-        st.write(f"- Algorithm used: {results['optimization'].get('algorithm_used', 'Standard')}")
+        st.write(f"- Algorithm used: {results.get('optimization', {}).get('algorithm_used', 'Standard')}")
         
         # Calculate space utilization
-        total_area = sum(info['area'] for info in results['rooms'].values())
-        box_area = results['total_boxes'] * results['parameters']['box_size'][0] * results['parameters']['box_size'][1]
+        total_area = sum(info['area'] for info in results.get('rooms', {}).values())
+        total_boxes = results.get('total_boxes', 0)
+        box_size = results.get('parameters', {}).get('box_size', [2.0, 1.5])
+        box_area = total_boxes * box_size[0] * box_size[1]
         utilization = (box_area / total_area * 100) if total_area > 0 else 0
         st.write(f"- Space utilization: {utilization:.1f}%")
 
@@ -1365,18 +1380,18 @@ if __name__ == "__main__":
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Total Boxes", results['total_boxes'])
+        st.metric("Total Boxes", results.get('total_boxes', 0))
     
     with col2:
-        total_area = results['total_boxes'] * results['parameters']['box_size'][0] * results['parameters']['box_size'][1]
+        total_area = results.get('total_boxes', 0) * results.get('parameters', {})['box_size'][0] * results.get('parameters', {})['box_size'][1]
         st.metric("Total Area", f"{total_area:.1f} m²")
     
     with col3:
-        efficiency = results['optimization'].get('total_efficiency', 0.85) * 100
+        efficiency = results.get('optimization', {}).get('total_efficiency', 0.85) * 100
         st.metric("Efficiency", f"{efficiency:.1f}%")
     
     with col4:
-        num_rooms = len(results['rooms'])
+        num_rooms = len(results.get('rooms', {}))
         st.metric("Rooms Analyzed", num_rooms)
     
     st.divider()
@@ -1385,7 +1400,7 @@ if __name__ == "__main__":
     st.subheader("🏠 Room Analysis")
     
     room_data = []
-    for zone_name, room_info in results['rooms'].items():
+    for zone_name, room_info in results.get('rooms', {}).items():
         placements = results['placements'].get(zone_name, [])
         room_data.append({
             'Zone': zone_name,
@@ -1479,7 +1494,7 @@ def display_statistics():
     
     with col1:
         # Room type distribution
-        room_types = [info['type'] for info in results['rooms'].values()]
+        room_types = [info['type'] for info in results.get('rooms', {}).values()]
         room_type_counts = pd.Series(room_types).value_counts()
         
         fig_pie = px.pie(
@@ -1506,8 +1521,10 @@ def display_statistics():
     st.subheader("⚡ Efficiency Metrics")
     
     # Calculate various efficiency metrics
-    total_room_area = sum(info['area'] for info in results['rooms'].values())
-    total_box_area = results['total_boxes'] * results['parameters']['box_size'][0] * results['parameters']['box_size'][1]
+    total_room_area = sum(info['area'] for info in results.get('rooms', {}).values())
+    total_boxes = results.get('total_boxes', 0)
+    box_size = results.get('parameters', {}).get('box_size', [2.0, 1.5])
+    total_box_area = total_boxes * box_size[0] * box_size[1]
     space_utilization = (total_box_area / total_room_area) * 100 if total_room_area > 0 else 0
     
     avg_suitability = 0
@@ -1526,7 +1543,7 @@ def display_statistics():
         st.metric("Avg. Suitability Score", f"{avg_suitability:.2f}")
     
     with metrics_col3:
-        st.metric("Boxes per m²", f"{results['total_boxes']/total_room_area:.2f}" if total_room_area > 0 else "0.00")
+        st.metric("Boxes per m²", f"{results.get('total_boxes', 0)/total_room_area:.2f}" if total_room_area > 0 else "0.00")
 
 def display_advanced_options():
     """Display advanced options and settings"""
@@ -1593,7 +1610,7 @@ def export_statistics_csv():
         
         # Create CSV data
         room_data = []
-        for zone_name, room_info in results['rooms'].items():
+        for zone_name, room_info in results.get('rooms', {}).items():
             placements = results['placements'].get(zone_name, [])
             room_data.append({
                 'Zone': zone_name,
@@ -1681,16 +1698,16 @@ def generate_report():
     with st.container():
         st.markdown("### 📋 Summary Report")
         st.markdown(f"""
-        **Analysis Complete**: {results['total_boxes']} optimal box placements found
+        **Analysis Complete**: {results.get('total_boxes', 0)} optimal box placements found
         
-        **Room Analysis**: {len(results['rooms'])} rooms analyzed
-        - Average confidence: {np.mean([r['confidence'] for r in results['rooms'].values()]):.1%}
+        **Room Analysis**: {len(results.get('rooms', {}))} rooms analyzed
+        - Average confidence: {np.mean([r['confidence'] for r in results.get('rooms', {}).values()]):.1%}
         
-        **Box Parameters**: {results['parameters']['box_size'][0]}m × {results['parameters']['box_size'][1]}m
+        **Box Parameters**: {results.get('parameters', {}).get('box_size', [2.0, 1.5])[0]}m × {results.get('parameters', {}).get('box_size', [2.0, 1.5])[1]}m
         
-        **Total Coverage**: {results['total_boxes'] * results['parameters']['box_size'][0] * results['parameters']['box_size'][1]:.1f} m²
+        **Total Coverage**: {results.get('total_boxes', 0) * results.get('parameters', {}).get('box_size', [2.0, 1.5])[0] * results.get('parameters', {}).get('box_size', [2.0, 1.5])[1]:.1f} m²
         
-        **Algorithm**: {results['optimization']['algorithm_used']}
+        **Algorithm**: {results.get('optimization', {}).get('algorithm_used', 'Standard Optimization')}
         """)
 
 if __name__ == "__main__":
