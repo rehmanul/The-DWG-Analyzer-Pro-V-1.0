@@ -74,6 +74,46 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Add responsive CSS
+st.markdown("""
+<style>
+    .main .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        max-width: 100%;
+    }
+    
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        .stColumn {
+            width: 100% !important;
+        }
+        .stButton > button {
+            width: 100%;
+            margin: 0.25rem 0;
+        }
+    }
+    
+    @media (min-width: 1200px) {
+        .main .block-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+    }
+    
+    .stFileUploader {
+        width: 100%;
+    }
+    
+    .stAlert {
+        margin: 1rem 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Initialize session state
 if 'zones' not in st.session_state:
     st.session_state.zones = []
@@ -933,20 +973,34 @@ def main():
             elif project_type == "Collaborative Team Project":
                 setup_collaboration_project()
         
+        # Enhanced file upload with better error handling
         uploaded_file = st.file_uploader(
             "Choose DWG/DXF files",
             type=['dwg', 'dxf'],
             accept_multiple_files=st.session_state.advanced_mode,
-            help="Upload architectural plan files for analysis"
+            help="Upload architectural plan files for analysis (Max 50MB per file)"
         )
         
         if uploaded_file is not None:
-            if isinstance(uploaded_file, list):
-                if st.button("🔍 Load Multiple Files", type="primary"):
-                    load_multiple_dwg_files(uploaded_file)
-            else:
-                if st.button("🔍 Load & Parse File", type="primary"):
-                    load_dwg_file(uploaded_file)
+            try:
+                if isinstance(uploaded_file, list):
+                    # Multiple files
+                    st.write(f"Selected {len(uploaded_file)} files")
+                    total_size = sum(f.size for f in uploaded_file) / (1024*1024)
+                    st.write(f"Total size: {total_size:.1f} MB")
+                    
+                    if st.button("Load Multiple Files", type="primary"):
+                        load_multiple_dwg_files(uploaded_file)
+                else:
+                    # Single file
+                    file_size_mb = uploaded_file.size / (1024*1024)
+                    st.write(f"File: {uploaded_file.name}")
+                    st.write(f"Size: {file_size_mb:.1f} MB")
+                    
+                    if st.button("Load & Parse File", type="primary"):
+                        load_dwg_file(uploaded_file)
+            except Exception as e:
+                st.error(f"File handling error: {str(e)}")
         
         st.divider()
         
@@ -1127,7 +1181,7 @@ def display_analysis_results():
         st.metric("Total Boxes", results.get('total_boxes', 0))
     
     with col2:
-        total_area = results.get('total_boxes', 0) * results.get('parameters', {})['box_size'][0] * results.get('parameters', {})['box_size'][1]
+        total_area = results.get('total_boxes', 0) * results.get('parameters', {}).get('box_size', [2.0, 1.5])[0] * results.get('parameters', {}).get('box_size', [2.0, 1.5])[1]
         st.metric("Total Area", f"{total_area:.1f} m²")
     
     with col3:
@@ -1383,7 +1437,7 @@ if __name__ == "__main__":
         st.metric("Total Boxes", results.get('total_boxes', 0))
     
     with col2:
-        total_area = results.get('total_boxes', 0) * results.get('parameters', {})['box_size'][0] * results.get('parameters', {})['box_size'][1]
+        total_area = results.get('total_boxes', 0) * results.get('parameters', {}).get('box_size', [2.0, 1.5])[0] * results.get('parameters', {}).get('box_size', [2.0, 1.5])[1]
         st.metric("Total Area", f"{total_area:.1f} m²")
     
     with col3:
@@ -1528,9 +1582,9 @@ def display_statistics():
     space_utilization = (total_box_area / total_room_area) * 100 if total_room_area > 0 else 0
     
     avg_suitability = 0
-    if results['placements']:
+    if results.get('placements'):
         all_scores = []
-        for placements in results['placements'].values():
+        for placements in results.get('placements', {}).values():
             all_scores.extend([p['suitability_score'] for p in placements])
         avg_suitability = np.mean(all_scores) if all_scores else 0
     
