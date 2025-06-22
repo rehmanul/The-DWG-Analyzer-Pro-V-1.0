@@ -852,8 +852,8 @@ def run_furniture_analysis(components):
             rooms = st.session_state.analysis_results.get('rooms', {})
             
             for zone_name, room_info in rooms.items():
-                space_type = room_info['type']
-                area = room_info['area']
+                space_type = room_info.get('type', 'Unknown')
+                area = room_info.get('area', 0.0)
                 
                 # Generate furniture configuration
                 config = furniture_catalog.recommend_furniture_for_space(
@@ -1072,7 +1072,7 @@ def display_advanced_statistics(components):
             st.subheader("Space Utilization")
             if 'total_boxes' in results:
                 box_area = results.get('total_boxes', 0) * 3.0  # Estimate
-                total_area = sum(info['area'] for info in results.get('rooms', {}).values())
+                total_area = sum(info.get('area', 0.0) for info in results.get('rooms', {}).values())
                 utilization = (box_area / total_area * 100) if total_area > 0 else 0
                 
                 fig = go.Figure(go.Indicator(
@@ -1199,13 +1199,13 @@ def display_analysis_results():
     
     room_data = []
     for zone_name, room_info in results.get('rooms', {}).items():
-        placements = results['placements'].get(zone_name, [])
+        placements = results.get('placements', {}).get(zone_name, [])
         room_data.append({
             'Zone': zone_name,
-            'Room Type': room_info['type'],
-            'Confidence': f"{room_info['confidence']:.1%}",
-            'Area (m²)': f"{room_info['area']:.1f}",
-            'Dimensions': f"{room_info['dimensions'][0]:.1f} × {room_info['dimensions'][1]:.1f}",
+            'Room Type': room_info.get('type', 'Unknown'),
+            'Confidence': f"{room_info.get('confidence', 0.0):.1%}",
+            'Area (m²)': f"{room_info.get('area', 0.0):.1f}",
+            'Dimensions': f"{room_info.get('dimensions', [0, 0])[0]:.1f} × {room_info.get('dimensions', [0, 0])[1]:.1f}",
             'Boxes Placed': len(placements),
             'Layer': room_info.get('layer', 'Unknown')
         })
@@ -1262,7 +1262,7 @@ def display_statistics():
     
     with col1:
         # Room type distribution
-        room_types = [info['type'] for info in results.get('rooms', {}).values()]
+        room_types = [info.get('type', 'Unknown') for info in results.get('rooms', {}).values()]
         room_type_counts = pd.Series(room_types).value_counts()
         
         fig_pie = px.pie(
@@ -1274,7 +1274,7 @@ def display_statistics():
     
     with col2:
         # Box placement by room
-        placement_counts = {zone: len(placements) for zone, placements in results['placements'].items()}
+        placement_counts = {zone: len(placements) for zone, placements in results.get('placements', {}).items()}
         
         fig_bar = px.bar(
             x=list(placement_counts.keys()),
@@ -1409,7 +1409,7 @@ def generate_report():
         st.write("**Project Overview:**")
         st.write(f"- Total zones analyzed: {len(st.session_state.zones)}")
         st.write(f"- Total box placements: {results.get('total_boxes', 0)}")
-        st.write(f"- Room types identified: {len(set(info['type'] for info in results.get('rooms', {}).values()))}")
+        st.write(f"- Room types identified: {len(set(info.get('type', 'Unknown') for info in results.get('rooms', {}).values()))}")
         
     with col2:
         st.write("**Optimization Results:**")
@@ -1418,7 +1418,7 @@ def generate_report():
         st.write(f"- Algorithm used: {results.get('optimization', {}).get('algorithm_used', 'Standard')}")
         
         # Calculate space utilization
-        total_area = sum(info['area'] for info in results.get('rooms', {}).values())
+        total_area = sum(info.get('area', 0.0) for info in results.get('rooms', {}).values())
         total_boxes = results.get('total_boxes', 0)
         box_size = results.get('parameters', {}).get('box_size', [2.0, 1.5])
         box_area = total_boxes * box_size[0] * box_size[1]
@@ -1455,13 +1455,13 @@ if __name__ == "__main__":
     
     room_data = []
     for zone_name, room_info in results.get('rooms', {}).items():
-        placements = results['placements'].get(zone_name, [])
+        placements = results.get('placements', {}).get(zone_name, [])
         room_data.append({
             'Zone': zone_name,
-            'Room Type': room_info['type'],
-            'Confidence': f"{room_info['confidence']:.1%}",
-            'Area (m²)': f"{room_info['area']:.1f}",
-            'Dimensions': f"{room_info['dimensions'][0]:.1f} × {room_info['dimensions'][1]:.1f}",
+            'Room Type': room_info.get('type', 'Unknown'),
+            'Confidence': f"{room_info.get('confidence', 0.0):.1%}",
+            'Area (m²)': f"{room_info.get('area', 0.0):.1f}",
+            'Dimensions': f"{room_info.get('dimensions', [0, 0])[0]:.1f} × {room_info.get('dimensions', [0, 0])[1]:.1f}",
             'Boxes Placed': len(placements),
             'Layer': room_info.get('layer', 'Unknown')
         })
@@ -1473,7 +1473,7 @@ if __name__ == "__main__":
     st.subheader("📦 Box Placement Details")
     
     placement_data = []
-    for zone_name, placements in results['placements'].items():
+    for zone_name, placements in results.get('placements', {}).items():
         for i, placement in enumerate(placements):
             placement_data.append({
                 'Zone': zone_name,
@@ -1548,7 +1548,7 @@ def display_statistics():
     
     with col1:
         # Room type distribution
-        room_types = [info['type'] for info in results.get('rooms', {}).values()]
+        room_types = [info.get('type', 'Unknown') for info in results.get('rooms', {}).values()]
         room_type_counts = pd.Series(room_types).value_counts()
         
         fig_pie = px.pie(
@@ -1560,7 +1560,7 @@ def display_statistics():
     
     with col2:
         # Box placement by room
-        placement_counts = {zone: len(placements) for zone, placements in results['placements'].items()}
+        placement_counts = {zone: len(placements) for zone, placements in results.get('placements', {}).items()}
         
         fig_bar = px.bar(
             x=list(placement_counts.keys()),
@@ -1575,7 +1575,7 @@ def display_statistics():
     st.subheader("⚡ Efficiency Metrics")
     
     # Calculate various efficiency metrics
-    total_room_area = sum(info['area'] for info in results.get('rooms', {}).values())
+    total_room_area = sum(info.get('area', 0.0) for info in results.get('rooms', {}).values())
     total_boxes = results.get('total_boxes', 0)
     box_size = results.get('parameters', {}).get('box_size', [2.0, 1.5])
     total_box_area = total_boxes * box_size[0] * box_size[1]
@@ -1665,14 +1665,14 @@ def export_statistics_csv():
         # Create CSV data
         room_data = []
         for zone_name, room_info in results.get('rooms', {}).items():
-            placements = results['placements'].get(zone_name, [])
+            placements = results.get('placements', {}).get(zone_name, [])
             room_data.append({
                 'Zone': zone_name,
-                'Room_Type': room_info['type'],
-                'Confidence': room_info['confidence'],
-                'Area_m2': room_info['area'],
-                'Width_m': room_info['dimensions'][0],
-                'Height_m': room_info['dimensions'][1],
+                'Room_Type': room_info.get('type', 'Unknown'),
+                'Confidence': room_info.get('confidence', 0.0),
+                'Area_m2': room_info.get('area', 0.0),
+                'Width_m': room_info.get('dimensions', [0, 0])[0],
+                'Height_m': room_info.get('dimensions', [0, 0])[1],
                 'Boxes_Placed': len(placements),
                 'Layer': room_info.get('layer', 'Unknown')
             })
@@ -1755,7 +1755,7 @@ def generate_report():
         **Analysis Complete**: {results.get('total_boxes', 0)} optimal box placements found
         
         **Room Analysis**: {len(results.get('rooms', {}))} rooms analyzed
-        - Average confidence: {np.mean([r['confidence'] for r in results.get('rooms', {}).values()]):.1%}
+        - Average confidence: {np.mean([r.get('confidence', 0.0) for r in results.get('rooms', {}).values()]):.1%}
         
         **Box Parameters**: {results.get('parameters', {}).get('box_size', [2.0, 1.5])[0]}m × {results.get('parameters', {}).get('box_size', [2.0, 1.5])[1]}m
         
