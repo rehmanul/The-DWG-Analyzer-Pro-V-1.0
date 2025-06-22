@@ -154,8 +154,8 @@ def setup_multi_floor_project():
     """Setup multi-floor building project"""
     st.write("**Multi-Floor Building Setup**")
     
-    floor_count = st.number_input("Number of Floors", min_value=1, max_value=50, value=3)
-    building_height = st.number_input("Total Building Height (m)", min_value=3.0, max_value=200.0, value=12.0)
+    floor_count = st.number_input("Number of Floors", min_value=1, max_value=50, value=3, key="floor_count_input")
+    building_height = st.number_input("Total Building Height (m)", min_value=3.0, max_value=200.0, value=12.0, key="building_height_input")
     
     if st.button("Initialize Multi-Floor Project"):
         st.session_state.multi_floor_project = {
@@ -169,8 +169,8 @@ def setup_collaboration_project():
     """Setup collaborative team project"""
     st.write("**Team Collaboration Setup**")
     
-    project_name = st.text_input("Project Name", value="New Architecture Project")
-    team_size = st.number_input("Team Size", min_value=1, max_value=20, value=3)
+    project_name = st.text_input("Project Name", value="New Architecture Project", key="project_name_input")
+    team_size = st.number_input("Team Size", min_value=1, max_value=20, value=3, key="team_size_input")
     
     if st.button("Start Collaboration"):
         st.session_state.collaboration_active = True
@@ -187,25 +187,25 @@ def setup_analysis_parameters(components):
             "Random Forest",
             "Gradient Boosting",
             "Neural Network"
-        ])
+        ], key="ai_model_select")
         
         # Analysis depth
         analysis_depth = st.selectbox("Analysis Depth", [
             "Comprehensive (All Features)",
             "Standard (Core Features)",
             "Quick (Basic Analysis)"
-        ])
+        ], key="analysis_depth_select")
         
         # BIM Integration
-        enable_bim = st.checkbox("Enable BIM Integration", value=True)
+        enable_bim = st.checkbox("Enable BIM Integration", value=True, key="enable_bim_check")
         if enable_bim:
-            bim_standard = st.selectbox("BIM Standard", ["IFC 4.3", "COBie 2.4", "Custom"])
+            bim_standard = st.selectbox("BIM Standard", ["IFC 4.3", "COBie 2.4", "Custom"], key="bim_standard_select")
         
         # Furniture catalog integration
-        enable_furniture = st.checkbox("Enable Furniture Catalog", value=True)
+        enable_furniture = st.checkbox("Enable Furniture Catalog", value=True, key="enable_furniture_check")
         if enable_furniture:
             sustainability_pref = st.selectbox("Sustainability Preference", 
-                                             ["A+ (Highest)", "A", "B", "C", "Any"])
+                                             ["A+ (Highest)", "A", "B", "C", "Any"], key="sustainability_select")
     else:
         # Standard parameters
         st.subheader("Analysis Parameters")
@@ -947,7 +947,7 @@ def main():
         st.markdown("**Complete Professional Solution for Architectural Analysis & Space Planning**")
     
     with col2:
-        st.session_state.advanced_mode = st.toggle("Advanced Mode", value=st.session_state.advanced_mode)
+        st.session_state.advanced_mode = st.toggle("Advanced Mode", value=st.session_state.advanced_mode, key="main_advanced_mode_toggle")
     
     # Sidebar for controls
     with st.sidebar:
