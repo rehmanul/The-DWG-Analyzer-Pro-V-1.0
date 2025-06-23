@@ -95,37 +95,78 @@ class PlanVisualizer:
     
     def create_3d_plot(self, zones: List[Dict], analysis_results: Dict) -> go.Figure:
         """
-        Create 3D visualization of box placements
+        Create 3D visualization of box placements and zones
         """
         fig = go.Figure()
         
-        if not analysis_results.get('placements'):
-            return fig
-        
-        box_height = 2.0  # Standard box height for 3D visualization
-        
-        for zone_name, placements in analysis_results['placements'].items():
-            for i, placement in enumerate(placements):
-                # Get box coordinates
-                coords = placement['box_coords']
-                x_coords = [p[0] for p in coords]
-                y_coords = [p[1] for p in coords]
+        # Add zones as 3D base
+        for i, zone in enumerate(zones):
+            if zone.get('points') and len(zone['points']) >= 3:
+                points = zone['points']
+                x_coords = [p[0] for p in points]
+                y_coords = [p[1] for p in points]
+                z_coords = [0] * len(points)
                 
-                # Create 3D box
-                self._add_3d_box(fig, x_coords, y_coords, box_height, 
-                                f"{zone_name}_Box_{i+1}")
+                # Add floor plane
+                fig.add_trace(go.Scatter3d(
+                    x=x_coords + [x_coords[0]],
+                    y=y_coords + [y_coords[0]], 
+                    z=z_coords + [z_coords[0]],
+                    mode='lines',
+                    name=f'Zone {i} Floor',
+                    line=dict(color='blue', width=3),
+                    showlegend=True
+                ))
+                
+                # Add zone walls (extruded to height)
+                wall_height = 3.0
+                for j in range(len(points)):
+                    next_j = (j + 1) % len(points)
+                    fig.add_trace(go.Scatter3d(
+                        x=[x_coords[j], x_coords[j], x_coords[next_j], x_coords[next_j], x_coords[j]],
+                        y=[y_coords[j], y_coords[j], y_coords[next_j], y_coords[next_j], y_coords[j]],
+                        z=[0, wall_height, wall_height, 0, 0],
+                        mode='lines',
+                        line=dict(color='lightblue', width=1),
+                        showlegend=False
+                    ))
+        
+        # Add box placements if available
+        if analysis_results.get('placements'):
+            box_height = 2.0
+            box_count = 0
+            
+            for zone_name, placements in analysis_results['placements'].items():
+                for placement in placements:
+                    box_count += 1
+                    if 'box_coords' in placement:
+                        coords = placement['box_coords']
+                        x_coords = [p[0] for p in coords]
+                        y_coords = [p[1] for p in coords]
+                        self._add_3d_box(fig, x_coords, y_coords, box_height, 
+                                        f"Box_{box_count}")
+                    elif 'position' in placement and 'size' in placement:
+                        # Alternative format
+                        pos = placement['position']
+                        size = placement['size']
+                        x, y = pos[0], pos[1]
+                        w, h = size[0], size[1]
+                        
+                        x_coords = [x-w/2, x+w/2, x+w/2, x-w/2]
+                        y_coords = [y-h/2, y-h/2, y+h/2, y+h/2]
+                        self._add_3d_box(fig, x_coords, y_coords, box_height, 
+                                        f"Box_{box_count}")
         
         fig.update_layout(
-            title="3D Box Placement Visualization",
+            title="3D Architectural Visualization",
             scene=dict(
                 xaxis_title="X (meters)",
                 yaxis_title="Y (meters)",
                 zaxis_title="Z (meters)",
-                aspectmode='manual',
-                aspectratio=dict(x=1, y=1, z=0.3)
+                aspectmode='cube'
             ),
-            width=800,
-            height=600
+            width=900,
+            height=700
         )
         
         return fig

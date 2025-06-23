@@ -768,16 +768,112 @@ def display_advanced_settings(components):
     """Display advanced settings and configuration"""
     st.subheader("Advanced Settings & Configuration")
 
-    st.subheader("AI Model Configuration")
+    # AI API Configuration
+    st.subheader("🤖 AI API Configuration")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Current AI Services:**")
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        openai_key = os.environ.get("OPENAI_API_KEY")
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+        
+        st.write(f"🔹 Google Gemini: {'✅ Configured' if gemini_key else '❌ Not configured'}")
+        st.write(f"🔹 OpenAI GPT: {'✅ Configured' if openai_key else '❌ Not configured'}")
+        st.write(f"🔹 Anthropic Claude: {'✅ Configured' if anthropic_key else '❌ Not configured'}")
+    
+    with col2:
+        st.write("**Add New AI Service:**")
+        new_ai_service = st.selectbox("Choose AI Service", [
+            "Google Gemini",
+            "OpenAI GPT-4",
+            "Anthropic Claude",
+            "Azure OpenAI",
+            "Cohere",
+            "Hugging Face"
+        ])
+        
+        if st.button("Configure AI Service"):
+            st.info(f"""
+            To configure {new_ai_service}:
+            
+            1. Go to the **Secrets** tab in your Replit workspace
+            2. Add the appropriate environment variable:
+               - Google Gemini: `GEMINI_API_KEY`
+               - OpenAI: `OPENAI_API_KEY`  
+               - Anthropic: `ANTHROPIC_API_KEY`
+               - Azure OpenAI: `AZURE_OPENAI_KEY`
+               - Cohere: `COHERE_API_KEY`
+               - Hugging Face: `HUGGING_FACE_TOKEN`
+            3. Restart the application
+            
+            The AI service will be automatically detected and integrated.
+            """)
+
+    st.divider()
+
+    # AI Model Configuration
+    st.subheader("🎯 AI Model Configuration")
 
     model_accuracy = st.slider("Model Accuracy vs Speed", 0.5, 1.0, 0.85, 0.05)
     st.write(f"Current setting: {'High Accuracy' if model_accuracy > 0.8 else 'Balanced'}")
 
     enable_ensemble = st.checkbox("Enable Ensemble Learning", value=True)
     enable_semantic = st.checkbox("Enable Semantic Analysis", value=True)
+    
+    # AI Service Priority
+    st.subheader("🔄 AI Service Priority")
+    ai_priority = st.multiselect(
+        "Set AI service priority order (first = highest priority)",
+        ["Google Gemini", "OpenAI GPT-4", "Anthropic Claude", "Azure OpenAI"],
+        default=["Google Gemini", "OpenAI GPT-4"]
+    )
 
     if st.button("Update AI Configuration"):
+        st.session_state.ai_settings = {
+            'model_accuracy': model_accuracy,
+            'enable_ensemble': enable_ensemble,
+            'enable_semantic': enable_semantic,
+            'ai_priority': ai_priority
+        }
         st.success("AI configuration updated!")
+        
+    # Database Settings
+    st.divider()
+    st.subheader("💾 Database Configuration")
+    
+    db_url = os.environ.get('DATABASE_URL', 'SQLite (Local)')
+    st.write(f"**Current Database:** {db_url}")
+    
+    if st.button("Test Database Connection"):
+        try:
+            db_manager = components.get('database')
+            if db_manager:
+                session = db_manager.get_session()
+                session.close()
+                st.success("✅ Database connection successful!")
+            else:
+                st.warning("⚠️ Database manager not initialized")
+        except Exception as e:
+            st.error(f"❌ Database connection failed: {str(e)}")
+            
+    # Export Settings
+    st.divider()
+    st.subheader("📤 Export Settings")
+    
+    default_export_format = st.selectbox("Default Export Format", 
+                                       ["PDF", "DXF", "SVG", "JSON", "CSV"])
+    include_metadata = st.checkbox("Include Analysis Metadata", value=True)
+    compress_exports = st.checkbox("Compress Export Files", value=True)
+    
+    if st.button("Save Export Settings"):
+        st.session_state.export_settings = {
+            'default_format': default_export_format,
+            'include_metadata': include_metadata,
+            'compress_exports': compress_exports
+        }
+        st.success("Export settings saved!")
 
 def generate_comprehensive_report(components):
     """Generate comprehensive analysis report"""

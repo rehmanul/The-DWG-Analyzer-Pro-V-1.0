@@ -265,23 +265,43 @@ class CADExporter:
                 points_3d = [(p[0], p[1], 0) for p in zone['points']]
                 msp.add_lwpolyline(points_3d, close=True, dxfattribs={'layer': 'WALLS'})
 
-    def _export_placements_to_dxf(self, msp: Modelspace, placements: List[Dict]):
+    def _export_placements_to_dxf(self, msp: Modelspace, placements):
         """Export equipment placements to DXF"""
-        for placement in placements:
-            pos = placement.get('position', {})
-            dims = placement.get('dimensions', {})
-            if pos and dims:
-                x, y = pos.get('x', 0), pos.get('y', 0)
-                w, h = dims.get('width', 1), dims.get('height', 1)
+        if isinstance(placements, dict):
+            # Handle dictionary of zone placements
+            for zone_name, zone_placements in placements.items():
+                for placement in zone_placements:
+                    self._export_single_placement(msp, placement)
+        elif isinstance(placements, list):
+            # Handle list of placements
+            for placement in placements:
+                self._export_single_placement(msp, placement)
+    
+    def _export_single_placement(self, msp: Modelspace, placement):
+        """Export a single placement to DXF"""
+        if isinstance(placement, dict):
+            # Handle standard placement format
+            pos = placement.get('position', [0, 0])
+            size = placement.get('size', [1, 1])
+            
+            if isinstance(pos, list) and len(pos) >= 2:
+                x, y = pos[0], pos[1]
+            else:
+                x, y = 0, 0
+                
+            if isinstance(size, list) and len(size) >= 2:
+                w, h = size[0], size[1]
+            else:
+                w, h = 1, 1
 
                 # Create rectangle for equipment
-                points = [
-                    (x - w/2, y - h/2, 0),
-                    (x + w/2, y - h/2, 0),
-                    (x + w/2, y + h/2, 0),
-                    (x - w/2, y + h/2, 0)
-                ]
-                msp.add_lwpolyline(points, close=True, dxfattribs={'layer': 'EQUIPMENT'})
+            points = [
+                (x - w/2, y - h/2, 0),
+                (x + w/2, y - h/2, 0),
+                (x + w/2, y + h/2, 0),
+                (x - w/2, y + h/2, 0)
+            ]
+            msp.add_lwpolyline(points, close=True, dxfattribs={'layer': 'EQUIPMENT'})
 
     def _export_annotations_to_dxf(self, msp: Modelspace, zones: List[Dict], results: Dict):
         """Export text annotations and dimensions to DXF"""

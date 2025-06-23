@@ -60,20 +60,29 @@ class FurnitureCatalogManager:
             width REAL NOT NULL,
             height REAL NOT NULL,
             depth REAL NOT NULL,
-            cost REAL NOT NULL,
-            sustainability_score REAL,
+            cost REAL NOT NULL DEFAULT 0.0,
+            sustainability_score REAL DEFAULT 0.5,
             brand TEXT,
             material TEXT,
             color_options TEXT,
             room_compatibility TEXT,
-            clearance_front REAL,
-            clearance_back REAL,
-            clearance_sides REAL,
-            weight REAL,
-            assembly_required BOOLEAN,
-            warranty_years INTEGER
+            clearance_front REAL DEFAULT 0.5,
+            clearance_back REAL DEFAULT 0.3,
+            clearance_sides REAL DEFAULT 0.3,
+            weight REAL DEFAULT 10.0,
+            assembly_required BOOLEAN DEFAULT 0,
+            warranty_years INTEGER DEFAULT 1
         )
         ''')
+        
+        # Add missing columns if they don't exist
+        cursor.execute("PRAGMA table_info(furniture_items)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'cost' not in columns:
+            cursor.execute('ALTER TABLE furniture_items ADD COLUMN cost REAL DEFAULT 0.0')
+        if 'sustainability_score' not in columns:
+            cursor.execute('ALTER TABLE furniture_items ADD COLUMN sustainability_score REAL DEFAULT 0.5')
 
         # Create configurations table
         cursor.execute('''
