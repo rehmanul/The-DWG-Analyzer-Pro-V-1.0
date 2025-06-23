@@ -1,8 +1,12 @@
 import ezdxf
+import dxfgrabber
 import tempfile
 import os
+import subprocess
+import shutil
 from typing import List, Dict, Any
 from pathlib import Path
+from shapely.geometry import Polygon, Point
 
 
 class DWGParser:
@@ -43,10 +47,9 @@ class DWGParser:
             file_ext = Path(filename).suffix.lower()
 
             if file_ext == '.dwg':
-                # Native DWG files are not supported by ezdxf
-                raise Exception(
-                    f"Native DWG files are not currently supported. Please convert '{filename}' to DXF format using AutoCAD, LibreCAD, or FreeCAD and try again. Most CAD software can export to DXF format."
-                )
+                # Try to handle DWG files with multiple approaches
+                zones = self._parse_dwg_file(temp_file_path, filename)
+                return zones
 
             # Try to read the DXF file
             try:
@@ -136,6 +139,226 @@ class DWGParser:
         validated_zones = self._validate_and_clean_zones(zones)
         print(f"Final validated zones: {len(validated_zones)}")
         return validated_zones
+
+    def _parse_dwg_file(self, file_path: str, filename: str) -> List[Dict[str, Any]]:
+        """Enhanced DWG file parsing with multiple fallback methods"""
+        zones = []
+        
+        print(f"Attempting to parse DWG file: {filename}")
+        
+        # Method 1: Try dxfgrabber (supports older DWG formats)
+        try:
+            print("Method 1: Trying dxfgrabber...")
+            dxf = dxfgrabber.readfile(file_path)
+            zones = self._extract_zones_from_dxfgrabber(dxf)
+            if zones:
+                print(f"Successfully parsed {len(zones)} zones using dxfgrabber")
+                return zones
+        except Exception as e:
+            print(f"dxfgrabber failed: {e}")
+        
+        # Method 2: Try ezdxf with recovery mode
+        try:
+            print("Method 2: Trying ezdxf recovery mode...")
+            doc = ezdxf.recover.readfile(file_path)
+            zones = self._extract_zones_from_ezdxf(doc)
+            if zones:
+                print(f"Successfully parsed {len(zones)} zones using ezdxf recovery")
+                return zones
+        except Exception as e:
+            print(f"ezdxf recovery failed: {e}")
+        
+        # Method 3: Check for available conversion tools
+        try:
+            print("Method 3: Attempting DWG to DXF conversion...")
+            converted_file = self._try_dwg_conversion(file_path)
+            if converted_file:
+                doc = ezdxf.readfile(converted_file)
+                zones = self._extract_zones_from_ezdxf(doc)
+                os.unlink(converted_file)  # Clean up converted file
+                if zones:
+                    print(f"Successfully converted and parsed {len(zones)} zones")
+                    return zones
+        except Exception as e:
+            print(f"DWG conversion failed: {e}")
+        
+        # If all methods fail, provide helpful error message
+        raise Exception(
+            f"Unable to parse DWG file '{filename}'. This could be due to:\n"
+            f"1. Newer DWG format not supported\n"
+            f"2. Encrypted or password-protected file\n"
+            f"3. Corrupted file\n\n"
+            f"Suggestions:\n"
+            f"• Convert to DXF format using AutoCAD, FreeCAD, or LibreCAD\n"
+            f"• Use 'Save As' → DXF format in your CAD software\n"
+            f"• Try an older DWG format version (R14, 2000, 2004)\n"
+            f"• Ensure the file is not password-protected"
+        )
+
+    def _extract_zones_from_dxfgrabber(self, dxf) -> List[Dict[str, Any]]:
+        """Extract zones using dxfgrabber"""
+        zones = []
+        
+        try:
+            # Parse different entity types
+            for entity in dxf.entities:
+                if entity.dxftype == 'LWPOLYLINE':
+                    zone = self._parse_lwpolyline_dxfgrabber(entity)
+                    if zone:
+                        zones.append(zone)
+                elif entity.dxftype == 'POLYLINE':
+                    zone = self._parse_polyline_dxfgrabber(entity)
+                    if zone:
+                        zones.append(zone)
+                elif entity.dxftype == 'HATCH':
+                    zone = self._parse_hatch_dxfgrabber(entity)
+                    if zone:
+                        zones.append(zone)
+        except Exception as e:
+            print(f"Error extracting zones with dxfgrabber: {e}")
+        
+        return zones
+
+    def _parse_lwpolyline_dxfgrabber(self, entity) -> Dict[str, Any]:
+        """Parse LWPOLYLINE entity from dxfgrabber"""
+        try:
+            if hasattr(entity, 'points') and len(entity.points) >= 3:
+                points = [(p[0], p[1]) for p in entity.points]
+                
+                # Check if polygon is closed
+                if hasattr(entity, 'closed') and entity.closed:
+                    if points[0] != points[-1]:
+                        points.append(points[0])
+                
+                # Calculate area using shoelace formula
+                area = self._calculate_polygon_area(points)
+                
+                if area > 1.0:  # Minimum area threshold
+                    return {
+                        'points': points,
+                        'area': area,
+                        'perimeter': self._calculate_perimeter(points),
+                        'layer': getattr(entity, 'layer', '0'),
+                        'entity_type': 'LWPOLYLINE',
+                        'bounds': self._calculate_bounds(points)
+                    }
+        except Exception as e:
+            print(f"Error parsing LWPOLYLINE: {e}")
+        
+        return None
+
+    def _parse_polyline_dxfgrabber(self, entity) -> Dict[str, Any]:
+        """Parse POLYLINE entity from dxfgrabber"""
+        try:
+            if hasattr(entity, 'vertices') and len(entity.vertices) >= 3:
+                points = [(v.location[0], v.location[1]) for v in entity.vertices]
+                
+                # Check if polygon is closed
+                if hasattr(entity, 'is_closed') and entity.is_closed:
+                    if points[0] != points[-1]:
+                        points.append(points[0])
+                
+                area = self._calculate_polygon_area(points)
+                
+                if area > 1.0:
+                    return {
+                        'points': points,
+                        'area': area,
+                        'perimeter': self._calculate_perimeter(points),
+                        'layer': getattr(entity, 'layer', '0'),
+                        'entity_type': 'POLYLINE',
+                        'bounds': self._calculate_bounds(points)
+                    }
+        except Exception as e:
+            print(f"Error parsing POLYLINE: {e}")
+        
+        return None
+
+    def _parse_hatch_dxfgrabber(self, entity) -> Dict[str, Any]:
+        """Parse HATCH entity from dxfgrabber"""
+        try:
+            if hasattr(entity, 'paths') and len(entity.paths) > 0:
+                # Get the outer boundary path
+                for path in entity.paths:
+                    if hasattr(path, 'path_type_flags') and path.path_type_flags & 1:  # External path
+                        points = []
+                        for edge in path.edges:
+                            if hasattr(edge, 'start_point'):
+                                points.append((edge.start_point[0], edge.start_point[1]))
+                        
+                        if len(points) >= 3:
+                            area = self._calculate_polygon_area(points)
+                            if area > 1.0:
+                                return {
+                                    'points': points,
+                                    'area': area,
+                                    'perimeter': self._calculate_perimeter(points),
+                                    'layer': getattr(entity, 'layer', '0'),
+                                    'entity_type': 'HATCH',
+                                    'bounds': self._calculate_bounds(points)
+                                }
+        except Exception as e:
+            print(f"Error parsing HATCH: {e}")
+        
+        return None
+
+    def _try_dwg_conversion(self, dwg_path: str) -> str:
+        """Try to convert DWG to DXF using available tools"""
+        
+        # Check if LibreCAD is available (command line tool)
+        if shutil.which('librecad'):
+            try:
+                output_path = dwg_path.replace('.dwg', '_converted.dxf')
+                subprocess.run([
+                    'librecad', '-c', dwg_path, '-o', output_path
+                ], check=True, capture_output=True)
+                if os.path.exists(output_path):
+                    return output_path
+            except:
+                pass
+        
+        # Check if FreeCAD is available
+        if shutil.which('freecad'):
+            try:
+                output_path = dwg_path.replace('.dwg', '_converted.dxf')
+                freecad_script = f"""
+import FreeCAD
+import Import
+doc = FreeCAD.newDocument()
+Import.insert('{dwg_path}', doc.Name)
+Import.export(FreeCAD.ActiveDocument.Objects, '{output_path}')
+FreeCAD.closeDocument(doc.Name)
+"""
+                with open('convert_script.py', 'w') as f:
+                    f.write(freecad_script)
+                
+                subprocess.run([
+                    'freecad', '--console', 'convert_script.py'
+                ], check=True, capture_output=True)
+                
+                os.unlink('convert_script.py')
+                if os.path.exists(output_path):
+                    return output_path
+            except:
+                pass
+        
+        return None
+
+    def _extract_zones_from_ezdxf(self, doc) -> List[Dict[str, Any]]:
+        """Extract zones using ezdxf (reuse existing method)"""
+        zones = []
+        modelspace = doc.modelspace()
+        
+        # Existing zone extraction logic
+        lwpolyline_zones = self._parse_lwpolylines(modelspace)
+        polyline_zones = self._parse_polylines(modelspace)
+        hatch_zones = self._parse_hatches(modelspace)
+        
+        zones.extend(lwpolyline_zones)
+        zones.extend(polyline_zones)
+        zones.extend(hatch_zones)
+        
+        return zones
 
     def parse_file_from_path(self, file_path: str) -> List[Dict[str, Any]]:
         """Parse DWG/DXF file from file path"""

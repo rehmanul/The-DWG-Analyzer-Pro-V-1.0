@@ -17,6 +17,7 @@ import numpy as np
 
 # Import custom modules
 from src.dwg_parser import DWGParser
+from src.enhanced_zone_detector import EnhancedZoneDetector
 from src.pdf_parser import PDFParser
 from src.ai_analyzer import AIAnalyzer
 from src.visualization_new import PlanVisualizer

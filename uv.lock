@@ -272,6 +272,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dxfgrabber"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/f9/33f2c36f49b24ffae6d7be973f347d8846040a42c38634e8e96aa93b2d32/dxfgrabber-1.0.1.zip", hash = "sha256:329ddb5fa5a11c0fd4b83b14615686c62924a323ccf4ef2e7bc5771788d220a1", size = 114274 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/23/54940748d3887e9f0939d839fac2699b9b3fb36d650ee93515f78cbe4d2a/dxfgrabber-1.0.1-py2.py3-none-any.whl", hash = "sha256:b54c6f93178551af5241dc0fe31bdb3a3ac61deb064bbcc5a0cebf769d74899a", size = 34595 },
+]
+
+[[package]]
 name = "ezdxf"
 version = "1.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1548,6 +1557,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "dash" },
     { name = "deap" },
+    { name = "dxfgrabber" },
     { name = "ezdxf" },
     { name = "fastapi" },
     { name = "google-genai" },
@@ -1579,6 +1589,7 @@ dependencies = [
 requires-dist = [
     { name = "dash", specifier = ">=3.0.4" },
     { name = "deap", specifier = ">=1.4.3" },
+    { name = "dxfgrabber", specifier = ">=1.0.1" },
     { name = "ezdxf", specifier = ">=1.4.2" },
     { name = "fastapi", specifier = ">=0.115.13" },
     { name = "google-genai", specifier = ">=1.21.1" },
