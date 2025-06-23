@@ -8,11 +8,17 @@ class GeminiAIAnalyzer:
     """Gemini AI integration for architectural analysis"""
     
     def __init__(self):
-        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     
     def analyze_room_type(self, zone_data: Dict) -> Dict:
         """Analyze room type using Gemini AI"""
+        if not self.available:
+            return {
+                'room_type': 'Unknown',
+                'confidence': 0.5,
+                'reasoning': 'Gemini AI not available'
+            }
+        
         try:
             # Prepare zone description for AI analysis
             zone_description = f"""

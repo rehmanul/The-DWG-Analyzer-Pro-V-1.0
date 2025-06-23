@@ -1,19 +1,17 @@
 import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
-import numpy as np
+from datetime import datetime
 import json
 import io
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.patches import Polygon as MplPolygon
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
 import asyncio
 import tempfile
 import os
-from datetime import datetime
 
 # Import custom modules
 from src.dwg_parser import DWGParser
@@ -38,32 +36,27 @@ try:
     ADVANCED_FEATURES_AVAILABLE = True
 except ImportError:
     ADVANCED_FEATURES_AVAILABLE = False
-    # Create fallback classes for production
+    # Import basic versions when advanced features not available
+    from src.furniture_catalog import FurnitureCatalogManager
+    from src.bim_integration import BIMModelGenerator
+    
     class AdvancedRoomClassifier:
-        def batch_classify(self, zones): return {}
+        def batch_classify(self, zones): 
+            # Basic classification fallback
+            return {i: {'room_type': 'Office', 'confidence': 0.7} for i in range(len(zones))}
+    
     class SemanticSpaceAnalyzer:
         def build_space_graph(self, zones, analysis): return {}
         def analyze_spatial_relationships(self): return {}
+    
     class OptimizationEngine:
         def optimize_layout(self, zones, params): return {'total_efficiency': 0.85}
-    class BIMModelGenerator:
-        def create_bim_model_from_analysis(self, zones, results, metadata):
-            class MockBIM:
-                def __init__(self):
-                    self.standards_compliance = {'ifc': {'score': 85.0}, 'spaces': {'compliant_spaces': 10}}
-            return MockBIM()
-    class FurnitureCatalogManager:
-        def recommend_furniture_for_space(self, space_type, space_area, budget, sustainability_preference):
-            class MockConfig:
-                def __init__(self):
-                    self.total_cost = 5000.0
-                    self.total_items = 15
-                    self.sustainability_score = 0.8
-            return MockConfig()
+    
     class CADExporter:
         def export_to_dxf(self, zones, results, path, **kwargs): pass
         def export_to_svg(self, zones, results, path): pass
-    class CollaborationManager: pass
+    
+    from src.collaborative_features import CollaborationManager, TeamPlanningInterface
     class MultiFloorAnalyzer: pass
 
 # Configure page
@@ -147,7 +140,7 @@ def get_advanced_components():
         'collaboration_manager': CollaborationManager(),
         'multi_floor_analyzer': MultiFloorAnalyzer(),
         'database': DatabaseManager(),
-        'ai_analyzer': GeminiAIAnalyzer()
+        'ai_analyzer': GeminiAIAnalyzer() if os.environ.get("GEMINI_API_KEY") else None
     }
 
 def setup_multi_floor_project():
@@ -539,7 +532,7 @@ def generate_comprehensive_report(components):
     if not st.session_state.analysis_results:
         st.warning("No analysis results available for report generation")
         return
-        
+
     try:
         with st.spinner("Generating comprehensive report..."):
             export_manager = ExportManager()
@@ -1110,68 +1103,70 @@ def display_advanced_statistics(components):
 def load_dwg_file(uploaded_file):
     """Load and parse DWG/DXF file"""
     try:
-        with st.spinner("🔄 Loading and parsing DWG file..."):
-            # Check file size
-            file_size = uploaded_file.size
-            if file_size > 200 * 1024 * 1024:  # 200MB limit
-                st.error("File too large. Please use a file smaller than 200MB.")
+        with st.spinner("Loading and parsing DWG file..."):
+            # Validate file
+            if uploaded_file is None:
+                st.error("No file selected.")
                 return
 
-            # Save uploaded file temporarily
-            file_bytes = uploaded_file.read()
+            # Check file extension
+            file_ext = uploaded_file.name.lower().split('.')[-1]
+            if file_ext not in ['dwg', 'dxf']:
+                st.error(f"Unsupported file format: {file_ext}. Please upload a DWG or DXF file.")
+                return
+
+            # Check file size (limit to 50MB for better performance)
+            file_size = uploaded_file.size
+            if file_size > 50 * 1024 * 1024:
+                st.error("File too large. Please use a file smaller than 50MB.")
+                return
+
+            if file_size == 0:
+                st.error("File appears to be empty.")
+                return
+
+            # Read file content
+            try:
+                file_bytes = uploaded_file.getvalue()
+            except Exception:
+                file_bytes = uploaded_file.read()
 
             if len(file_bytes) == 0:
-                st.error("File appears to be empty or corrupted.")
+                st.error("Unable to read file content.")
                 return
 
-            # Parse the DWG/DXF file
-            parser = DWGParser()
-            zones = parser.parse_file(file_bytes, uploaded_file.name)
+            # Create temporary file for processing
+            with tempfile.NamedTemporaryFile(suffix=f'.{file_ext}', delete=False) as tmp_file:
+                tmp_file.write(file_bytes)
+                tmp_file_path = tmp_file.name
 
-            if not zones:
-                st.warning("No valid zones found in the file. Please check if the file contains closed polygons or room boundaries.")
-                return
+            try:
+                # Parse the DWG/DXF file
+                parser = DWGParser()
+                zones = parser.parse_file_from_path(tmp_file_path)
 
-            st.session_state.zones = zones
-            st.session_state.dwg_loaded = True
+                if not zones:
+                    st.warning("No valid zones found in the file. Please check if the file contains closed polygons or room boundaries.")
+                    return
 
-            st.success(f"✅ Successfully loaded {len(zones)} zones from {uploaded_file.name}")
-            st.rerun()
+                st.session_state.zones = zones
+                st.session_state.dwg_loaded = True
+                st.session_state.current_filename = uploaded_file.name
 
-    except PermissionError:
-        st.error("❌ Permission denied. Please try uploading the file again.")
+                st.success(f"Successfully loaded {len(zones)} zones from {uploaded_file.name}")
+                st.rerun()
+
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(tmp_file_path)
+                except:
+                    pass
+
     except Exception as e:
         error_msg = str(e)
-        if "403" in error_msg or "Forbidden" in error_msg:
-            st.error("❌ Upload forbidden. The file might be too large or in an unsupported format. Try a smaller DWG/DXF file.")
-        elif "400" in error_msg or "Bad Request" in error_msg:
-            st.error("❌ Bad request. Please ensure the file is a valid DWG or DXF file.")
-        else:
-            st.error(f"❌ Error loading DWG file: {error_msg}")
-
-        st.info("💡 Try these solutions:\n- Use a smaller file (under 200MB)\n- Ensure the file is a valid DWG/DXF format\n- Try refreshing the page and uploading again")
-
-def load_pdf_file(uploaded_file):
-    """Load and parse PDF file"""
-    try:
-        with st.spinner("🔄 Loading and parsing PDF file..."):
-            file_bytes = uploaded_file.read()
-            parser = PDFParser()
-            zones = parser.parse_file(file_bytes, uploaded_file.name)
-
-            if not zones:
-                st.warning("No valid zones found in the PDF file. Please check if the file contains vector shapes or room boundaries.")
-                return
-
-            st.session_state.zones = zones
-            st.session_state.dwg_loaded = True
-
-            st.success(f"✅ Successfully loaded {len(zones)} zones from {uploaded_file.name}")
-            st.rerun()
-
-    except Exception as e:
-        st.error(f"❌ Error loading PDF file: {str(e)}")
-
+        st.error(f"Error loading DWG file: {error_msg}")
+        st.info("Try these solutions: Use a smaller file (under 50MB), ensure the file is a valid DWG/DXF format, or try refreshing the page.")
 
 # Keep existing functions for backward compatibility
 def run_ai_analysis(box_length, box_width, margin, confidence_threshold, enable_rotation, smart_spacing):
@@ -1342,18 +1337,22 @@ def display_statistics():
         placement_counts = {zone: len(placements) for zone, placements in results.get('placements', {}).items()}
 
         if placement_counts:
-            fig_bar = go.Figure(data=[
-                go.Bar(x=list(placement_counts.keys()), y=list(placement_counts.values()))
-            ])
-            fig_bar.update_layout(
-                title="Boxes per Zone",
-                xaxis_title="Zone",
-                yaxis_title="Number of Boxes"
+            # Create DataFrame for Plotly
+            df = pd.DataFrame({
+                'Zone': list(placement_counts.keys()),
+                'Count': list(placement_counts.values())
+            })
+
+            fig_bar = px.bar(
+                df,
+                x='Zone',
+                y='Count',
+                title="Boxes per Zone"
             )
         else:
-            fig_bar = go.Figure()
+            fig_bar = px.Figure()
             fig_bar.update_layout(title="No placement data available")
-            fig_bar.update_layout(xaxis=dict(tickangle=45))
+            fig_bar.update_layout(xaxes=dict(tickangle=45))
         st.plotly_chart(fig_bar, use_container_width=True)
 
     # Efficiency metrics

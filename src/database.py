@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Optional
 import json
 
 # Database configuration
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///dwg_analyzer.db')
 Base = declarative_base()
 
 class Project(Base):

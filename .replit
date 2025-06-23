@@ -1,4 +1,4 @@
-modules = ["python-3.11"]
+modules = ["python-3.11", "postgresql-16"]
 
 [nix]
 channel = "stable-24_05"
@@ -6,7 +6,7 @@ packages = ["boost", "cairo", "ffmpeg-full", "freetype", "geos", "ghostscript", 
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["sh", "-c", "streamlit run app.py --server.port 8501 --server.address 0.0.0.0"]
+run = ["streamlit", "run", "app.py", "--server.port", "5000"]
 
 [workflows]
 runButton = "Project"
@@ -18,20 +18,11 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Streamlit Server"
+args = "streamlit_website"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "streamlit_website"
-
-[[workflows.workflow]]
-name = "Streamlit Server"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "streamlit run app.py --server.port 5000"
-waitForPort = 5000
+args = "DWG Analyzer App"
 
 [[workflows.workflow]]
 name = "streamlit_website"
@@ -41,6 +32,41 @@ author = "agent"
 task = "shell.exec"
 args = "uv add ezdxf shapely matplotlib plotly pandas numpy reportlab rectpack opencv-python scikit-learn scipy"
 
+[[workflows.workflow]]
+name = "Streamlit App"
+author = 42824376
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0"
+
+[[workflows.workflow]]
+name = "Streamlit Server Fixed"
+author = 42824376
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false --server.fileWatcherType none --server.maxUploadSize 200"
+
+[[workflows.workflow]]
+name = "DWG Analyzer App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS false"
+waitForPort = 5000
+
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3000
+
+[[ports]]
+localPort = 5002
+externalPort = 3001
