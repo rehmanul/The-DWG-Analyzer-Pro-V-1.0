@@ -269,9 +269,9 @@ class FurnitureCatalogManager:
         
         cursor.execute('''
         SELECT * FROM furniture_items 
-        WHERE room_compatibility LIKE ? AND cost <= ? AND sustainability_score >= ?
+        WHERE cost <= ? AND sustainability_score >= ?
         ORDER BY sustainability_score DESC, cost ASC
-        ''', (f'%{space_type}%', budget, sustainability_pref))
+        ''', (budget, sustainability_pref))
         
         rows = cursor.fetchall()
         conn.close()
@@ -325,7 +325,12 @@ class FurnitureCatalogManager:
                     positions.append({
                         "x": len(positions) * 1.5,
                         "y": 1.0,
-                        "rotation": 0
+                        "rotation": 0,
+                        "dimensions": {
+                            "width": item.dimensions["width"],
+                            "height": item.dimensions["height"],
+                            "depth": item.dimensions["depth"]
+                        }
                     })
                     break
         

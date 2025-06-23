@@ -50,9 +50,7 @@ except ImportError:
     
     
     
-    class CADExporter:
-        def export_to_dxf(self, zones, results, path, **kwargs): pass
-        def export_to_svg(self, zones, results, path): pass
+    
     
     from src.collaborative_features import CollaborationManager, TeamPlanningInterface
     class MultiFloorAnalyzer: pass
@@ -452,7 +450,7 @@ def display_furniture_catalog(components):
     with col2:
         st.metric("Total Cost", f"${total_cost:,.0f}")
     with col3:
-        st.metric("Sustainability Score", f"{avg_sustainability:.2f}")
+        st.metric("Sustainability Score", f"{avg_sustainability:.2f}")2f}")
 
 def display_cad_export_interface(components):
     """Display CAD export interface"""
@@ -928,7 +926,7 @@ def run_furniture_analysis(components):
                         config.__dict__
                     )
 
-            st.session_state.furniture_configurations = configurations
+            st.session_state.furniture_configurations = configurationstions
 
             total_cost = sum(config.total_cost for config in configurations)
             total_items = sum(config.total_items for config in configurations)
@@ -936,7 +934,7 @@ def run_furniture_analysis(components):
             st.success(f"Furniture analysis complete! {total_items} items, ${total_cost:,.0f} total cost")
 
     except Exception as e:
-        st.error(f"Error in furniture analysis: {str(e)}")
+        st.error(f"Error in furniture analysis: {str(e)}")e)}")
 
 def generate_cad_export(components):
     """Generate CAD export package"""

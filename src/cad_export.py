@@ -359,3 +359,50 @@ class CADExporter:
         x = sum(p[0] for p in points) / len(points)
         y = sum(p[1] for p in points) / len(points)
         return (x, y)
+    
+    def create_technical_drawing_package(self, zones: List[Dict], results: Dict, 
+                                       output_dir: str = "exports") -> Dict[str, str]:
+        """Create a complete technical drawing package with multiple formats"""
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        package_files = {}
+        
+        try:
+            # Export to DXF
+            dxf_path = os.path.join(output_dir, "architectural_analysis.dxf")
+            self.export_to_dxf(zones, results, dxf_path)
+            package_files['dxf'] = dxf_path
+            
+            # Export to SVG
+            svg_path = os.path.join(output_dir, "architectural_analysis.svg")
+            self.export_to_svg(zones, results, svg_path)
+            package_files['svg'] = svg_path
+            
+            # Export to PDF
+            pdf_path = os.path.join(output_dir, "architectural_analysis.pdf")
+            self.export_to_pdf(zones, results, pdf_path)
+            package_files['pdf'] = pdf_path
+            
+            # Create analysis report
+            report_path = os.path.join(output_dir, "analysis_report.json")
+            with open(report_path, 'w') as f:
+                json.dump(results, f, indent=2, default=str)
+            package_files['report'] = report_path
+            
+            return package_files
+            
+        except Exception as e:
+            # Return basic package with error information
+            error_report = {
+                'error': str(e),
+                'zones_count': len(zones),
+                'results_available': bool(results)
+            }
+            
+            error_path = os.path.join(output_dir, "export_error.json")
+            with open(error_path, 'w') as f:
+                json.dump(error_report, f, indent=2)
+            
+            return {'error_report': error_path}
