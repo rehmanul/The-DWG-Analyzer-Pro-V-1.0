@@ -21,7 +21,7 @@ class CADExporter:
             'dimension_scale': 1.0,
             'layer_colors': {
                 'walls': colors.BLACK,
-                'doors': colors.BROWN,
+                'doors': colors.YELLOW,
                 'windows': colors.BLUE,
                 'furniture': colors.GREEN,
                 'dimensions': colors.RED,
@@ -246,7 +246,7 @@ class CADExporter:
         """Create standard architectural layers"""
         layers = [
             ('WALLS', colors.BLACK),
-            ('DOORS', colors.BROWN),
+            ('DOORS', colors.YELLOW),
             ('WINDOWS', colors.BLUE),
             ('FURNITURE', colors.GREEN),
             ('DIMENSIONS', colors.RED),
