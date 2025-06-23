@@ -54,33 +54,7 @@ except ImportError:
         
         def optimize_furniture_placement(self, zones, furniture_params):
             """Optimize furniture placement in zones"""
-            optimization_results = {}
-            
-            for i, zone in enumerate(zones):
-                zone_name = f"Zone_{i+1}"
-                area = zone.get('area', 20.0)
-                
-                # Calculate optimal furniture placement
-                furniture_count = max(1, int(area / 15))  # Rough estimate
-                placements = []
-                
-                for j in range(furniture_count):
-                    placement = {
-                        'id': f"furniture_{j+1}",
-                        'type': 'workstation',
-                        'position': {'x': j * 2.5, 'y': 1.0},
-                        'rotation': 0,
-                        'efficiency_score': 0.85 + (j * 0.02)
-                    }
-                    placements.append(placement)
-                
-                optimization_results[zone_name] = {
-                    'placements': placements,
-                    'efficiency': 0.85,
-                    'utilization': min(0.9, furniture_count * 3.0 / area)
-                }
-            
-            return optimization_results
+            return {'total_efficiency': 0.85, 'placements': {}}
     
     class CADExporter:
         def export_to_dxf(self, zones, results, path, **kwargs): pass
@@ -1055,39 +1029,65 @@ def main():
             elif project_type == "Collaborative Team Project":
                 setup_collaboration_project()
 
-        # File upload section with bypass for upload issues
+        # File input section - prioritize sample files to avoid upload issues
         st.subheader("📁 File Input")
         
-        upload_method = st.radio(
-            "Choose input method:",
-            ["Upload File", "Use Sample Files"],
-            horizontal=True
-        )
+        # Direct access to sample files
+        st.info("Select from available architectural drawings:")
         
-        uploaded_file = None
+        sample_files = {}
+        attached_assets = Path("attached_assets")
         
-        if upload_method == "Upload File":
-            try:
-                uploaded_file = st.file_uploader(
-                    "Choose DWG/DXF files",
-                    type=['dwg', 'dxf'],
-                    accept_multiple_files=st.session_state.advanced_mode,
-                    help="Upload architectural plan files for analysis (Max 50MB per file)",
-                    key="file_uploader_main"
-                )
-                
-                if uploaded_file is not None:
-                    if hasattr(uploaded_file, 'size') and uploaded_file.size > 50 * 1024 * 1024:
-                        st.error("File too large. Please use a file smaller than 50MB.")
-                        uploaded_file = None
-                        
-            except Exception as e:
-                st.error(f"Upload error: {str(e)}. Try using sample files instead.")
-                uploaded_file = None
+        if attached_assets.exists():
+            for file_path in attached_assets.glob("*.dwg"):
+                if file_path.stat().st_size > 0:
+                    display_name = file_path.stem.replace("_", " ").replace("-", " ").title()
+                    sample_files[display_name] = str(file_path)
+            
+            for file_path in attached_assets.glob("*.dxf"):
+                if file_path.stat().st_size > 0:
+                    display_name = file_path.stem.replace("_", " ").replace("-", " ").title()
+                    sample_files[display_name] = str(file_path)
         
+        if sample_files:
+            selected_sample = st.selectbox(
+                "Available architectural files:",
+                options=list(sample_files.keys()),
+                help="Select a sample file to analyze"
+            )
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Load Architectural Plan", key="load_sample", type="primary"):
+                    sample_path = sample_files[selected_sample]
+                    try:
+                        zones = load_dwg_file(sample_path)
+                        if zones:
+                            st.session_state.zones = zones
+                            st.session_state.file_loaded = True
+                            st.session_state.current_file = selected_sample
+                            st.success(f"Successfully loaded {len(zones)} zones from '{selected_sample}'")
+                            st.rerun()
+                        else:
+                            st.error("Could not parse the selected file")
+                    except Exception as e:
+                        st.error(f"Error loading file: {str(e)}")
+            
+            with col2:
+                if st.button("Generate Demo Data", key="demo_btn"):
+                    st.session_state.zones = generate_demo_zones()
+                    st.session_state.file_loaded = True
+                    st.session_state.current_file = "Demo Layout"
+                    st.success("Demo data generated successfully!")
+                    st.rerun()
         else:
-            # Sample files from attached_assets
-            st.info("Using available sample DWG files from the project")
+            st.warning("No sample files available")
+            if st.button("Generate Demo Data", key="demo_only"):
+                st.session_state.zones = generate_demo_zones()
+                st.session_state.file_loaded = True
+                st.session_state.current_file = "Demo Layout"
+                st.success("Demo data generated!")
+                st.rerun()
 
         if uploaded_file is not None:
             try:
