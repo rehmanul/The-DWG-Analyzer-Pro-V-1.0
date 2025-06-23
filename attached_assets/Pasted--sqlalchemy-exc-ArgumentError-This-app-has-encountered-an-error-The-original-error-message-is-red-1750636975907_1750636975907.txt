@@ -1,0 +1,31 @@
+
+sqlalchemy.exc.ArgumentError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
+Traceback:
+File "/mount/src/the-dwg-analyzer-pro-v-1.0/app.py", line 1509, in <module>
+    main()
+    ~~~~^^
+File "/mount/src/the-dwg-analyzer-pro-v-1.0/app.py", line 941, in main
+    components = get_advanced_components()
+File "/home/adminuser/venv/lib/python3.13/site-packages/streamlit/runtime/caching/cache_utils.py", line 219, in __call__
+    return self._get_or_create_cached_value(args, kwargs, spinner_message)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.13/site-packages/streamlit/runtime/caching/cache_utils.py", line 261, in _get_or_create_cached_value
+    return self._handle_cache_miss(cache, value_key, func_args, func_kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.13/site-packages/streamlit/runtime/caching/cache_utils.py", line 320, in _handle_cache_miss
+    computed_value = self._info.func(*func_args, **func_kwargs)
+File "/mount/src/the-dwg-analyzer-pro-v-1.0/app.py", line 149, in get_advanced_components
+    'database': DatabaseManager(),
+                ~~~~~~~~~~~~~~~^^
+File "/mount/src/the-dwg-analyzer-pro-v-1.0/src/database.py", line 178, in __init__
+    self.engine = create_engine(DATABASE_URL)
+                  ~~~~~~~~~~~~~^^^^^^^^^^^^^^
+File "<string>", line 2, in create_engine
+File "/home/adminuser/venv/lib/python3.13/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+    return fn(*args, **kwargs)  # type: ignore[no-any-return]
+File "/home/adminuser/venv/lib/python3.13/site-packages/sqlalchemy/engine/create.py", line 549, in create_engine
+    u = _url.make_url(url)
+File "/home/adminuser/venv/lib/python3.13/site-packages/sqlalchemy/engine/url.py", line 860, in make_url
+    raise exc.ArgumentError(
+        f"Expected string or URL object, got {name_or_url!r}"
+    )
