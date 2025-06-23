@@ -9,7 +9,7 @@ deploymentTarget = "autoscale"
 run = ["sh", "-c", "streamlit run app.py --server.port 8501 --server.address 0.0.0.0"]
 
 [workflows]
-runButton = "Streamlit Server Fixed"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
@@ -23,6 +23,10 @@ args = "Streamlit Server"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "streamlit_website"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Minimal Real App"
 
 [[workflows.workflow]]
 name = "Streamlit Server"
@@ -59,6 +63,23 @@ mode = "sequential"
 task = "shell.exec"
 args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false --server.fileWatcherType none --server.maxUploadSize 200"
 
+[[workflows.workflow]]
+name = "Minimal Real App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run minimal_real_app.py --server.port 5000 --server.address 0.0.0.0"
+waitForPort = 5000
+
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3000
+
+[[ports]]
+localPort = 5002
+externalPort = 3001
