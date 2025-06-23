@@ -26,7 +26,7 @@ args = "streamlit_website"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Working DWG App"
+args = "Direct DWG Parser"
 
 [[workflows.workflow]]
 name = "Streamlit Server"
@@ -64,12 +64,12 @@ task = "shell.exec"
 args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false --server.fileWatcherType none --server.maxUploadSize 200"
 
 [[workflows.workflow]]
-name = "Working DWG App"
+name = "Direct DWG Parser"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run working_dwg_app.py --server.port 5000 --server.address 0.0.0.0"
+args = "streamlit run direct_dwg_parser.py --server.port 5000 --server.address 0.0.0.0"
 waitForPort = 5000
 
 [[ports]]
