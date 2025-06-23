@@ -91,9 +91,16 @@ class DWGParser:
             print(f"  Line networks: {len(line_zones)} zones")
             print(f"  Circles: {len(circle_zones)} zones")
 
-            # If no zones found, analyze entity types for debugging
+            # If no zones found, try additional parsing methods
             if len(zones) == 0:
                 self._analyze_entity_types(modelspace)
+                # Try parsing TEXT entities as room labels and surrounding geometry
+                text_zones = self._parse_text_based_zones(modelspace)
+                zones.extend(text_zones)
+                
+                # Try parsing BLOCK references as rooms
+                block_zones = self._parse_block_zones(modelspace)
+                zones.extend(block_zones)
 
             # Add layer information to zones
             for zone in zones:
@@ -415,8 +422,9 @@ class DWGParser:
             if entity.dxftype() == 'LINE':
                 start = (entity.dxf.start.x, entity.dxf.start.y)
                 end = (entity.dxf.end.x, entity.dxf.end.y)
-                # Skip zero-length lines
-                if abs(start[0] - end[0]) > 1e-6 or abs(start[1] - end[1]) > 1e-6:
+                # Skip very short lines (less than 0.1 units)
+                line_length = ((end[0] - start[0])**2 + (end[1] - start[1])**2)**0.5
+                if line_length > 0.1:
                     lines.append({
                         'start': start,
                         'end': end,
@@ -427,7 +435,7 @@ class DWGParser:
         print(f"Found {len(lines)} valid LINE entities")
 
         # Try to form closed polygons from connected lines
-        tolerance = 0.1
+        tolerance = 1.0  # Increase tolerance for better line connection
 
         for i, start_line in enumerate(lines):
             if start_line['used']:
@@ -482,21 +490,34 @@ class DWGParser:
                                                            abs(point[1] - unique_points[-1][1]) > 1e-6):
                                         unique_points.append(point)
 
-                                    if len(unique_points) >= 4:  # At least 3 unique + closing
-                                        poly = Polygon(unique_points)
-                                        if poly.is_valid and poly.area > 1.0:
-                                            zone = {
-                                                'points': list(poly.exterior.coords)[:-1],
-                                                'area': poly.area,
-                                                'perimeter': poly.length,
-                                                'layer': start_line['layer'],
-                                                'source': 'line_network'
-                                            }
-                                            zones.append(zone)
+                                # Need at least 3 unique points for a valid polygon
+                                if len(unique_points) >= 3:
+                                    try:
+                                        # Ensure polygon is properly closed for Shapely
+                                        if unique_points[0] != unique_points[-1]:
+                                            polygon_coords = unique_points + [unique_points[0]]
+                                        else:
+                                            polygon_coords = unique_points
+                                        
+                                        # Only create if we have at least 4 coordinates (3 unique + closing)
+                                        if len(polygon_coords) >= 4:
+                                            poly = Polygon(polygon_coords)
+                                            if poly.is_valid and poly.area > 1.0:
+                                                zone = {
+                                                    'points': unique_points,  # Store without closing point
+                                                    'area': poly.area,
+                                                    'perimeter': poly.length,
+                                                    'layer': start_line['layer'],
+                                                    'source': 'line_network'
+                                                }
+                                                zones.append(zone)
 
-                                            # Mark lines as used
-                                            for line_idx in used_lines:
-                                                lines[line_idx]['used'] = True
+                                                # Mark lines as used
+                                                for line_idx in used_lines:
+                                                    lines[line_idx]['used'] = True
+                                    except Exception:
+                                        # Skip invalid polygons silently
+                                        pass
                         except Exception:
                             # Skip invalid polygons silently
                             pass
@@ -576,6 +597,167 @@ class DWGParser:
 
         # Remove the last point if it's the same as the first (Shapely handles closure)
         if len(cleaned) > 3 and (abs(cleaned[0][0] - cleaned[-1][0]) < 1e-6 and 
+
+
+    def _parse_text_based_zones(self, modelspace) -> List[Dict]:
+        """Parse zones based on text labels and surrounding geometry"""
+        zones = []
+        
+        # Find text entities that might be room labels
+        room_texts = []
+        for entity in modelspace.query('TEXT'):
+            text_content = entity.dxf.text.strip().upper()
+            # Look for common room keywords
+            room_keywords = ['ROOM', 'OFFICE', 'BEDROOM', 'KITCHEN', 'BATHROOM', 'LIVING', 'HALL', 'STORAGE']
+            if any(keyword in text_content for keyword in room_keywords):
+                room_texts.append({
+                    'text': text_content,
+                    'position': (entity.dxf.insert.x, entity.dxf.insert.y),
+                    'layer': entity.dxf.layer
+                })
+        
+        # For each text, try to find surrounding lines that form a room
+        for text_info in room_texts:
+            nearby_lines = []
+            text_pos = text_info['position']
+            search_radius = 50.0  # Search within 50 units
+            
+            for entity in modelspace.query('LINE'):
+                start = (entity.dxf.start.x, entity.dxf.start.y)
+                end = (entity.dxf.end.x, entity.dxf.end.y)
+                
+                # Check if line is near the text
+                for point in [start, end]:
+                    dist = ((point[0] - text_pos[0])**2 + (point[1] - text_pos[1])**2)**0.5
+                    if dist <= search_radius:
+                        nearby_lines.append(entity)
+                        break
+            
+            # Try to form a polygon from nearby lines
+            if len(nearby_lines) >= 3:
+                try:
+                    polygon = self._create_polygon_from_text_lines(nearby_lines, text_pos)
+                    if polygon and polygon.area > 5.0:
+                        zone = {
+                            'points': list(polygon.exterior.coords)[:-1],
+                            'area': polygon.area,
+                            'perimeter': polygon.length,
+                            'layer': text_info['layer'],
+                            'source': 'text_based',
+                            'room_label': text_info['text']
+                        }
+                        zones.append(zone)
+                except Exception:
+                    continue
+        
+        return zones
+    
+    def _parse_block_zones(self, modelspace) -> List[Dict]:
+        """Parse zones from block references (furniture, fixtures)"""
+        zones = []
+        
+        # Look for INSERT entities (block references)
+        inserts = list(modelspace.query('INSERT'))
+        
+        # Group inserts that might form room boundaries
+        if len(inserts) >= 4:  # Need at least 4 for a room
+            # Try to find rectangular patterns
+            for i, insert in enumerate(inserts):
+                pos = (insert.dxf.insert.x, insert.dxf.insert.y)
+                
+                # Find other inserts that could form a rectangle
+                corner_candidates = []
+                for j, other_insert in enumerate(inserts[i+1:], i+1):
+                    other_pos = (other_insert.dxf.insert.x, other_insert.dxf.insert.y)
+                    dist = ((pos[0] - other_pos[0])**2 + (pos[1] - other_pos[1])**2)**0.5
+                    
+                    # Look for inserts within reasonable distance
+                    if 2.0 <= dist <= 50.0:
+                        corner_candidates.append(other_pos)
+                
+                # If we have enough corners, try to form a rectangle
+                if len(corner_candidates) >= 3:
+                    try:
+                        all_points = [pos] + corner_candidates[:3]
+                        # Simple rectangular zone approximation
+                        xs = [p[0] for p in all_points]
+                        ys = [p[1] for p in all_points]
+                        
+                        # Create bounding rectangle
+                        min_x, max_x = min(xs), max(xs)
+                        min_y, max_y = min(ys), max(ys)
+                        
+                        if (max_x - min_x) > 2.0 and (max_y - min_y) > 2.0:
+                            rect_points = [
+                                (min_x, min_y), (max_x, min_y),
+                                (max_x, max_y), (min_x, max_y)
+                            ]
+                            
+                            area = (max_x - min_x) * (max_y - min_y)
+                            perimeter = 2 * ((max_x - min_x) + (max_y - min_y))
+                            
+                            zone = {
+                                'points': rect_points,
+                                'area': area,
+                                'perimeter': perimeter,
+                                'layer': insert.dxf.layer,
+                                'source': 'block_pattern'
+                            }
+                            zones.append(zone)
+                            break  # Only create one zone per starting point
+                    except Exception:
+                        continue
+        
+        return zones
+    
+    def _create_polygon_from_text_lines(self, lines, center_point):
+        """Create polygon from lines near a text label"""
+        try:
+            # Sort lines by distance from center
+            line_data = []
+            for line in lines:
+                start = (line.dxf.start.x, line.dxf.start.y)
+                end = (line.dxf.end.x, line.dxf.end.y)
+                mid_point = ((start[0] + end[0])/2, (start[1] + end[1])/2)
+                dist = ((mid_point[0] - center_point[0])**2 + (mid_point[1] - center_point[1])**2)**0.5
+                line_data.append((dist, start, end))
+            
+            # Sort by distance and take closest lines
+            line_data.sort(key=lambda x: x[0])
+            closest_lines = line_data[:8]  # Use up to 8 closest lines
+            
+            # Extract all endpoints
+            points = []
+            for _, start, end in closest_lines:
+                points.extend([start, end])
+            
+            if len(points) >= 6:  # Need at least 3 unique points
+                # Remove duplicates
+                unique_points = []
+                for point in points:
+                    is_duplicate = False
+                    for existing in unique_points:
+                        if abs(point[0] - existing[0]) < 0.5 and abs(point[1] - existing[1]) < 0.5:
+                            is_duplicate = True
+                            break
+                    if not is_duplicate:
+                        unique_points.append(point)
+                
+                if len(unique_points) >= 3:
+                    from shapely.geometry import Polygon
+                    # Create convex hull
+                    from scipy.spatial import ConvexHull
+                    import numpy as np
+                    
+                    hull = ConvexHull(np.array(unique_points))
+                    hull_points = [unique_points[i] for i in hull.vertices]
+                    
+                    return Polygon(hull_points)
+        except Exception:
+            pass
+        
+        return None
+
                                 abs(cleaned[0][1] - cleaned[-1][1]) < 1e-6):
             cleaned = cleaned[:-1]
 
