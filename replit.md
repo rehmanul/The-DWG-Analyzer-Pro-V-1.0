@@ -111,6 +111,8 @@ The AI Architectural Space Analyzer Pro is a comprehensive Streamlit-based appli
 - **Component Loading**: Fallback classes for missing advanced modules
 
 # Changelog
+- June 23, 2025: **ENHANCED DWG SUPPORT** - Added native DWG file parsing with multiple fallback methods (dxfgrabber, ezdxf recovery, conversion tools)
+- June 23, 2025: **IMPROVED ZONE DETECTION** - Enhanced room detection accuracy with line network analysis and text-guided zone detection
 - June 23, 2025: **PRODUCTION LAUNCH** - Complete transformation from mock/dummy to full production system
 - June 23, 2025: Fixed all plotly.express compatibility issues for stable chart rendering
 - June 23, 2025: Enhanced DWG file upload with detailed error handling and progress indicators
