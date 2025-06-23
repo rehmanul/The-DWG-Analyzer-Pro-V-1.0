@@ -1,714 +1,464 @@
 import ezdxf
-from ezdxf import units
-from ezdxf.addons import r12writer
-import json
-import numpy as np
-from typing import Dict, List, Any, Tuple, Optional
-from datetime import datetime
-import math
-from shapely.geometry import Polygon, Point
-import tempfile
+from ezdxf import colors
+from ezdxf.addons.drawing import RenderContext, Frontend
+from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+import matplotlib.pyplot as plt
+from typing import Dict, List, Any, Optional, Tuple
 import os
+from pathlib import Path
+import json
+import xml.etree.ElementTree as ET
+from io import BytesIO
+import base64
 
 class CADExporter:
-    """
-    Advanced CAD export functionality supporting multiple formats
-    including DXF, DWG, and specialized architectural formats
-    """
+    """Professional CAD export functionality for architectural drawings"""
     
     def __init__(self):
-        self.supported_formats = ['DXF', 'DWG', 'SVG', 'PDF']
-        self.scale_factors = {
-            'mm': 1.0,
-            'm': 1000.0,
-            'cm': 100.0,
-            'in': 25.4,
-            'ft': 304.8
+        self.dxf_version = 'R2018'
+        self.units = 'Meters'
+        self.precision = 3
+        self.layer_standards = self._initialize_layer_standards()
+        self.color_scheme = self._initialize_color_scheme()
+        self.line_weights = self._initialize_line_weights()
+    
+    def _initialize_layer_standards(self) -> Dict[str, Dict]:
+        """Initialize AIA layer standards for architectural drawings"""
+        return {
+            'A-WALL': {'color': 7, 'linetype': 'CONTINUOUS', 'lineweight': 0.5, 'description': 'Walls'},
+            'A-DOOR': {'color': 3, 'linetype': 'CONTINUOUS', 'lineweight': 0.35, 'description': 'Doors'},
+            'A-GLAZ': {'color': 4, 'linetype': 'CONTINUOUS', 'lineweight': 0.25, 'description': 'Windows/Glazing'},
+            'A-FURN': {'color': 8, 'linetype': 'CONTINUOUS', 'lineweight': 0.18, 'description': 'Furniture'},
+            'A-AREA': {'color': 2, 'linetype': 'DASHED', 'lineweight': 0.13, 'description': 'Area boundaries'},
+            'A-ANNO-TEXT': {'color': 1, 'linetype': 'CONTINUOUS', 'lineweight': 0.13, 'description': 'Annotations'},
+            'A-ANNO-DIMS': {'color': 1, 'linetype': 'CONTINUOUS', 'lineweight': 0.13, 'description': 'Dimensions'},
+            'A-GRID': {'color': 6, 'linetype': 'CENTER', 'lineweight': 0.35, 'description': 'Grid lines'},
+            'A-COLS': {'color': 7, 'linetype': 'CONTINUOUS', 'lineweight': 0.5, 'description': 'Columns'},
+            'A-ROOF': {'color': 5, 'linetype': 'CONTINUOUS', 'lineweight': 0.35, 'description': 'Roof elements'}
         }
-        
-        # Layer definitions for different elements
-        self.layer_definitions = {
-            'ZONES': {'color': 1, 'linetype': 'CONTINUOUS', 'lineweight': 0.25},
-            'FURNITURE': {'color': 3, 'linetype': 'CONTINUOUS', 'lineweight': 0.18},
-            'DIMENSIONS': {'color': 2, 'linetype': 'CONTINUOUS', 'lineweight': 0.13},
-            'TEXT': {'color': 7, 'linetype': 'CONTINUOUS', 'lineweight': 0.09},
-            'GRID': {'color': 8, 'linetype': 'DASHED', 'lineweight': 0.09},
-            'CENTERLINES': {'color': 5, 'linetype': 'CENTER', 'lineweight': 0.13},
-            'HIDDEN': {'color': 6, 'linetype': 'HIDDEN', 'lineweight': 0.13},
-            'CONSTRUCTION': {'color': 9, 'linetype': 'PHANTOM', 'lineweight': 0.09}
+    
+    def _initialize_color_scheme(self) -> Dict[str, int]:
+        """Initialize color scheme for different room types"""
+        return {
+            'Office': colors.CYAN,
+            'Conference Room': colors.BLUE,
+            'Open Office': colors.MAGENTA,
+            'Kitchen': colors.YELLOW,
+            'Bathroom': colors.GREEN,
+            'Storage': colors.BROWN,
+            'Corridor': colors.WHITE,
+            'Reception': colors.RED,
+            'Lobby': colors.BLUE,
+            'Server Room': colors.MAGENTA,
+            'Break Room': colors.YELLOW
         }
-        
-        # Text styles
-        self.text_styles = {
-            'STANDARD': {'font': 'Arial', 'height': 2.5},
-            'TITLE': {'font': 'Arial', 'height': 5.0},
-            'NOTES': {'font': 'Arial', 'height': 2.0},
-            'DIMENSIONS': {'font': 'Arial', 'height': 1.8}
+    
+    def _initialize_line_weights(self) -> Dict[str, float]:
+        """Initialize line weights for different elements"""
+        return {
+            'walls': 0.5,
+            'doors': 0.35,
+            'windows': 0.25,
+            'furniture': 0.18,
+            'annotations': 0.13,
+            'dimensions': 0.13,
+            'area_boundaries': 0.13
         }
     
     def export_to_dxf(self, zones: List[Dict], analysis_results: Dict, 
-                     output_path: str, scale: str = 'm',
-                     include_furniture: bool = True,
-                     include_dimensions: bool = True,
-                     include_annotations: bool = True) -> str:
-        """Export architectural plan to DXF format"""
-        
-        # Create new DXF document
-        doc = ezdxf.new('R2010')
-        doc.units = units.M if scale == 'm' else units.MM
-        
-        # Setup layers
-        self._setup_layers(doc)
-        
-        # Setup text styles
-        self._setup_text_styles(doc)
-        
-        # Get model space
-        msp = doc.modelspace()
-        
-        # Add zones
-        self._add_zones_to_dxf(msp, zones, analysis_results, scale)
-        
-        # Add furniture if requested
-        if include_furniture and analysis_results.get('placements'):
-            self._add_furniture_to_dxf(msp, analysis_results['placements'], scale)
-        
-        # Add dimensions if requested
-        if include_dimensions:
-            self._add_dimensions_to_dxf(msp, zones, scale)
-        
-        # Add annotations if requested
-        if include_annotations:
-            self._add_annotations_to_dxf(msp, zones, analysis_results, scale)
-        
-        # Add title block
-        self._add_title_block(msp, analysis_results, scale)
-        
-        # Add reference grid
-        self._add_reference_grid(msp, zones, scale)
-        
-        # Save the DXF file
-        doc.saveas(output_path)
-        
-        return output_path
+                     output_path: str, **options) -> bool:
+        """Export architectural analysis to DXF format"""
+        try:
+            # Create new DXF document
+            doc = ezdxf.new(self.dxf_version)
+            doc.units = ezdxf.units.M  # Set units to meters
+            
+            # Setup layers
+            self._setup_layers(doc)
+            
+            # Get model space
+            msp = doc.modelspace()
+            
+            # Draw zones and rooms
+            self._draw_zones(msp, zones, analysis_results)
+            
+            # Add annotations
+            self._add_annotations(msp, zones, analysis_results)
+            
+            # Add dimensions
+            if options.get('include_dimensions', True):
+                self._add_dimensions(msp, zones)
+            
+            # Add furniture if available
+            if options.get('include_furniture', True):
+                self._add_furniture_layout(msp, zones, analysis_results)
+            
+            # Add title block
+            if options.get('include_title_block', True):
+                self._add_title_block(msp, analysis_results)
+            
+            # Save the document
+            doc.saveas(output_path)
+            return True
+            
+        except Exception as e:
+            print(f"Error exporting to DXF: {e}")
+            return False
     
     def _setup_layers(self, doc):
         """Setup standard architectural layers"""
-        for layer_name, properties in self.layer_definitions.items():
-            layer = doc.layers.new(layer_name)
+        for layer_name, properties in self.layer_standards.items():
+            layer = doc.layers.add(layer_name)
             layer.color = properties['color']
             layer.linetype = properties['linetype']
-            layer.lineweight = int(properties['lineweight'] * 100)  # Convert to lineweight units
+            layer.lineweight = int(properties['lineweight'] * 100)  # Convert to AutoCAD units
+            layer.description = properties['description']
     
-    def _setup_text_styles(self, doc):
-        """Setup text styles"""
-        for style_name, properties in self.text_styles.items():
-            doc.styles.new(style_name, dxfattribs={
-                'font': properties['font'],
-                'height': properties['height']
-            })
-    
-    def _add_zones_to_dxf(self, msp, zones: List[Dict], analysis_results: Dict, scale: str):
-        """Add zone boundaries to DXF"""
-        scale_factor = self.scale_factors[scale]
-        rooms = analysis_results.get('rooms', {})
-        
+    def _draw_zones(self, msp, zones: List[Dict], analysis_results: Dict):
+        """Draw room zones with proper styling"""
         for i, zone in enumerate(zones):
-            if not zone.get('points'):
+            points = zone.get('points', [])
+            if len(points) < 3:
                 continue
             
-            zone_name = f"Zone_{i}"
-            room_info = rooms.get(zone_name, {})
-            
-            # Scale points
-            scaled_points = [(p[0] * scale_factor, p[1] * scale_factor) for p in zone['points']]
-            
-            # Create polyline for zone boundary
-            polyline = msp.add_lwpolyline(scaled_points + [scaled_points[0]])
-            polyline.dxf.layer = 'ZONES'
-            polyline.closed = True
-            
-            # Add zone label
-            poly = Polygon(zone['points'])
-            centroid = poly.centroid
-            centroid_scaled = (centroid.x * scale_factor, centroid.y * scale_factor)
-            
-            # Room type label
+            # Get room analysis
+            room_info = analysis_results.get('rooms', {}).get(i, {})
             room_type = room_info.get('type', 'Unknown')
-            area = room_info.get('area', 0)
             
-            label_text = f"{room_type}\n{area:.1f} {scale}²"
+            # Create closed polyline for room boundary
+            room_points = [(point[0], point[1], 0) for point in points]
+            room_points.append(room_points[0])  # Close the polyline
             
-            text = msp.add_text(
-                label_text,
-                dxfattribs={
-                    'layer': 'TEXT',
-                    'style': 'STANDARD',
-                    'height': 2.5 * scale_factor / 1000,  # Adjust for scale
-                    'halign': 1,  # Center
-                    'valign': 2   # Middle
-                }
-            )
-            text.set_pos(centroid_scaled)
+            # Draw room boundary
+            polyline = msp.add_lwpolyline(room_points)
+            polyline.layer = 'A-AREA'
+            
+            # Fill area with hatch pattern
+            hatch_color = self.color_scheme.get(room_type, colors.WHITE)
+            hatch = msp.add_hatch(color=hatch_color)
+            hatch.layer = 'A-AREA'
+            
+            # Create boundary path for hatch
+            with hatch.edit_boundary() as boundary:
+                boundary.add_polyline_path([(p[0], p[1]) for p in room_points[:-1]], is_closed=True)
+            
+            # Set hatch pattern
+            hatch.set_pattern_fill("ANSI31", scale=0.1)
     
-    def _add_furniture_to_dxf(self, msp, placements: Dict[str, List[Dict]], scale: str):
-        """Add furniture placements to DXF"""
-        scale_factor = self.scale_factors[scale]
+    def _add_annotations(self, msp, zones: List[Dict], analysis_results: Dict):
+        """Add room labels and annotations"""
+        for i, zone in enumerate(zones):
+            # Calculate centroid for label placement
+            points = zone.get('points', [])
+            if not points:
+                continue
+            
+            centroid_x = sum(p[0] for p in points) / len(points)
+            centroid_y = sum(p[1] for p in points) / len(points)
+            
+            # Get room information
+            room_info = analysis_results.get('rooms', {}).get(i, {})
+            room_type = room_info.get('type', 'Unknown')
+            area = zone.get('area', 0)
+            
+            # Create room label
+            room_number = f"R{i+1:03d}"
+            room_label = f"{room_number}\\P{room_type}\\P{area:.1f} m²"
+            
+            # Add text annotation
+            text = msp.add_mtext(
+                room_label,
+                insert=(centroid_x, centroid_y, 0),
+                char_height=0.5,
+                width=3.0
+            )
+            text.layer = 'A-ANNO-TEXT'
+            text.dxf.attachment_point = 5  # Middle center
+    
+    def _add_dimensions(self, msp, zones: List[Dict]):
+        """Add dimensional annotations"""
+        for i, zone in enumerate(zones):
+            bounds = zone.get('bounds')
+            if not bounds:
+                continue
+            
+            x_min, y_min, x_max, y_max = bounds
+            width = x_max - x_min
+            height = y_max - y_min
+            
+            # Add width dimension
+            width_dim = msp.add_linear_dim(
+                base=(x_min, y_min - 1.0, 0),
+                p1=(x_min, y_min, 0),
+                p2=(x_max, y_min, 0),
+                text=f"{width:.2f}m",
+                dimstyle="EZDXF"
+            )
+            width_dim.layer = 'A-ANNO-DIMS'
+            
+            # Add height dimension
+            height_dim = msp.add_linear_dim(
+                base=(x_min - 1.0, y_min, 0),
+                p1=(x_min, y_min, 0),
+                p2=(x_min, y_max, 0),
+                text=f"{height:.2f}m",
+                dimstyle="EZDXF"
+            )
+            height_dim.layer = 'A-ANNO-DIMS'
+    
+    def _add_furniture_layout(self, msp, zones: List[Dict], analysis_results: Dict):
+        """Add furniture layout from analysis results"""
+        furniture_data = analysis_results.get('furniture_optimization', {})
         
-        for zone_name, zone_placements in placements.items():
-            for placement in zone_placements:
-                # Scale furniture coordinates
-                scaled_coords = [
-                    (p[0] * scale_factor, p[1] * scale_factor) 
-                    for p in placement['box_coords']
+        for i, zone in enumerate(zones):
+            zone_furniture = furniture_data.get(f'zone_{i}', {})
+            placements = zone_furniture.get('placements', [])
+            
+            for placement in placements:
+                # Get furniture dimensions and position
+                x = placement.get('x', 0)
+                y = placement.get('y', 0)
+                width = placement.get('width', 1.0)
+                depth = placement.get('depth', 1.0)
+                rotation = placement.get('rotation', 0)
+                furniture_type = placement.get('type', 'Generic')
+                
+                # Create furniture representation
+                furniture_points = [
+                    (x, y, 0),
+                    (x + width, y, 0),
+                    (x + width, y + depth, 0),
+                    (x, y + depth, 0)
                 ]
                 
-                # Create polyline for furniture
-                furniture = msp.add_lwpolyline(scaled_coords + [scaled_coords[0]])
-                furniture.dxf.layer = 'FURNITURE'
-                furniture.closed = True
+                furniture_rect = msp.add_lwpolyline(furniture_points, close=True)
+                furniture_rect.layer = 'A-FURN'
                 
-                # Add hatch pattern for furniture
-                hatch = msp.add_hatch(color=3)
-                hatch.dxf.layer = 'FURNITURE'
-                hatch.paths.add_polyline_path(scaled_coords + [scaled_coords[0]])
-                hatch.set_pattern_fill('ANSI31', scale=0.5)
+                # Rotate if needed
+                if rotation != 0:
+                    center = (x + width/2, y + depth/2, 0)
+                    furniture_rect.rotate(center, rotation)
                 
-                # Add furniture centerlines
-                center_x = sum(p[0] for p in scaled_coords) / len(scaled_coords)
-                center_y = sum(p[1] for p in scaled_coords) / len(scaled_coords)
+                # Add furniture label
+                label_x = x + width/2
+                label_y = y + depth/2
                 
-                # Cross centerlines
-                size = placement['size']
-                half_length = size[0] * scale_factor / 2
-                half_width = size[1] * scale_factor / 2
-                
-                # Horizontal centerline
-                msp.add_line(
-                    (center_x - half_length, center_y),
-                    (center_x + half_length, center_y),
-                    dxfattribs={'layer': 'CENTERLINES'}
+                furniture_label = msp.add_text(
+                    furniture_type[:8],  # Abbreviated name
+                    insert=(label_x, label_y, 0),
+                    height=0.2
                 )
-                
-                # Vertical centerline
-                msp.add_line(
-                    (center_x, center_y - half_width),
-                    (center_x, center_y + half_width),
-                    dxfattribs={'layer': 'CENTERLINES'}
-                )
+                furniture_label.layer = 'A-FURN'
+                furniture_label.dxf.halign = 1  # Center
+                furniture_label.dxf.valign = 1  # Middle
     
-    def _add_dimensions_to_dxf(self, msp, zones: List[Dict], scale: str):
-        """Add dimensions to zone boundaries"""
-        scale_factor = self.scale_factors[scale]
-        
-        for zone in zones:
-            if not zone.get('points') or len(zone['points']) < 3:
-                continue
-            
-            points = zone['points']
-            
-            # Add dimensions for major edges
-            for i in range(len(points)):
-                p1 = points[i]
-                p2 = points[(i + 1) % len(points)]
-                
-                # Calculate edge length
-                length = math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)
-                
-                # Only dimension significant edges (> 1m)
-                if length > 1.0:
-                    # Scale points
-                    p1_scaled = (p1[0] * scale_factor, p1[1] * scale_factor)
-                    p2_scaled = (p2[0] * scale_factor, p2[1] * scale_factor)
-                    
-                    # Calculate dimension line offset
-                    dx = p2[0] - p1[0]
-                    dy = p2[1] - p1[1]
-                    
-                    # Perpendicular offset for dimension line
-                    offset_distance = 1.0 * scale_factor  # 1m offset
-                    if abs(dx) > abs(dy):  # Horizontal edge
-                        offset = (0, offset_distance if dy >= 0 else -offset_distance)
-                    else:  # Vertical edge
-                        offset = (offset_distance if dx >= 0 else -offset_distance, 0)
-                    
-                    dim_p1 = (p1_scaled[0] + offset[0], p1_scaled[1] + offset[1])
-                    dim_p2 = (p2_scaled[0] + offset[0], p2_scaled[1] + offset[1])
-                    
-                    # Add dimension
-                    dim = msp.add_linear_dim(
-                        base=dim_p1,
-                        p1=p1_scaled,
-                        p2=p2_scaled,
-                        dxfattribs={'layer': 'DIMENSIONS'}
-                    )
-                    
-                    # Format dimension text
-                    dim.render()
-    
-    def _add_annotations_to_dxf(self, msp, zones: List[Dict], analysis_results: Dict, scale: str):
-        """Add annotations and notes"""
-        scale_factor = self.scale_factors[scale]
-        
-        # Add analysis summary
-        if analysis_results.get('total_boxes'):
-            summary_text = (
-                f"ANALYSIS SUMMARY\n"
-                f"Total Boxes: {analysis_results['total_boxes']}\n"
-                f"Total Zones: {len(zones)}\n"
-                f"Analysis Date: {datetime.now().strftime('%Y-%m-%d')}"
-            )
-            
-            # Position in upper right corner
-            bounds = self._calculate_overall_bounds(zones)
-            if bounds:
-                max_x, max_y = bounds[2] * scale_factor, bounds[3] * scale_factor
-                
-                msp.add_text(
-                    summary_text,
-                    dxfattribs={
-                        'layer': 'TEXT',
-                        'style': 'NOTES',
-                        'height': 2.0 * scale_factor / 1000
-                    }
-                ).set_pos((max_x + 5 * scale_factor, max_y))
-        
-        # Add room-specific annotations
-        rooms = analysis_results.get('rooms', {})
-        placements = analysis_results.get('placements', {})
-        
-        for i, zone in enumerate(zones):
-            zone_name = f"Zone_{i}"
-            zone_placements = placements.get(zone_name, [])
-            room_info = rooms.get(zone_name, {})
-            
-            if zone_placements and room_info:
-                # Add placement count annotation
-                poly = Polygon(zone['points'])
-                centroid = poly.centroid
-                
-                # Offset annotation below room label
-                annotation_pos = (
-                    centroid.x * scale_factor,
-                    (centroid.y - 2) * scale_factor
-                )
-                
-                annotation_text = f"Furniture: {len(zone_placements)} items"
-                
-                msp.add_text(
-                    annotation_text,
-                    dxfattribs={
-                        'layer': 'TEXT',
-                        'style': 'NOTES',
-                        'height': 1.5 * scale_factor / 1000,
-                        'halign': 1,
-                        'valign': 2
-                    }
-                ).set_pos(annotation_pos)
-    
-    def _add_title_block(self, msp, analysis_results: Dict, scale: str):
-        """Add standard architectural title block"""
-        scale_factor = self.scale_factors[scale]
-        
-        # Title block dimensions (scaled)
-        tb_width = 200 * scale_factor / 1000
-        tb_height = 50 * scale_factor / 1000
-        
-        # Position at bottom right
-        bounds = self._calculate_overall_bounds([])
-        if not bounds:
-            # Default position
-            tb_x, tb_y = 0, -tb_height - 10 * scale_factor / 1000
-        else:
-            tb_x = bounds[2] * scale_factor - tb_width
-            tb_y = bounds[1] * scale_factor - tb_height - 10 * scale_factor / 1000
+    def _add_title_block(self, msp, analysis_results: Dict):
+        """Add professional title block"""
+        # Title block dimensions and position
+        tb_width = 8.0
+        tb_height = 4.0
+        tb_x = -2.0
+        tb_y = -6.0
         
         # Draw title block border
-        tb_points = [
-            (tb_x, tb_y),
-            (tb_x + tb_width, tb_y),
-            (tb_x + tb_width, tb_y + tb_height),
-            (tb_x, tb_y + tb_height),
-            (tb_x, tb_y)
-        ]
+        title_block = msp.add_lwpolyline([
+            (tb_x, tb_y, 0),
+            (tb_x + tb_width, tb_y, 0),
+            (tb_x + tb_width, tb_y + tb_height, 0),
+            (tb_x, tb_y + tb_height, 0)
+        ], close=True)
+        title_block.layer = 'A-ANNO-TEXT'
         
-        msp.add_lwpolyline(tb_points, dxfattribs={'layer': 'TEXT'})
+        # Add title block information
+        project_name = analysis_results.get('project_name', 'DWG Analysis Project')
+        drawing_title = "Architectural Space Analysis"
+        drawing_number = "A-001"
+        scale = "1:100"
+        date = "2025-06-23"
         
-        # Add title block content
-        title_text = "AI ARCHITECTURAL SPACE ANALYZER"
-        subtitle_text = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-        
-        # Project title
+        # Project name
         msp.add_text(
-            title_text,
-            dxfattribs={
-                'layer': 'TEXT',
-                'style': 'TITLE',
-                'height': 4.0 * scale_factor / 1000,
-                'halign': 1
-            }
-        ).set_pos((tb_x + tb_width/2, tb_y + tb_height*0.7))
+            project_name,
+            insert=(tb_x + 0.2, tb_y + 3.5, 0),
+            height=0.4
+        ).layer = 'A-ANNO-TEXT'
         
-        # Subtitle
+        # Drawing title
         msp.add_text(
-            subtitle_text,
-            dxfattribs={
-                'layer': 'TEXT',
-                'style': 'STANDARD',
-                'height': 2.0 * scale_factor / 1000,
-                'halign': 1
-            }
-        ).set_pos((tb_x + tb_width/2, tb_y + tb_height*0.4))
+            drawing_title,
+            insert=(tb_x + 0.2, tb_y + 2.8, 0),
+            height=0.3
+        ).layer = 'A-ANNO-TEXT'
         
-        # Scale indicator
-        scale_text = f"SCALE: 1:{int(scale_factor)}"
+        # Drawing number
         msp.add_text(
-            scale_text,
-            dxfattribs={
-                'layer': 'TEXT',
-                'style': 'STANDARD',
-                'height': 1.8 * scale_factor / 1000,
-                'halign': 1
-            }
-        ).set_pos((tb_x + tb_width/2, tb_y + tb_height*0.1))
+            f"Drawing No: {drawing_number}",
+            insert=(tb_x + 0.2, tb_y + 2.2, 0),
+            height=0.2
+        ).layer = 'A-ANNO-TEXT'
+        
+        # Scale
+        msp.add_text(
+            f"Scale: {scale}",
+            insert=(tb_x + 0.2, tb_y + 1.8, 0),
+            height=0.2
+        ).layer = 'A-ANNO-TEXT'
+        
+        # Date
+        msp.add_text(
+            f"Date: {date}",
+            insert=(tb_x + 0.2, tb_y + 1.4, 0),
+            height=0.2
+        ).layer = 'A-ANNO-TEXT'
+        
+        # Software credit
+        msp.add_text(
+            "Generated by AI Architectural Space Analyzer Pro",
+            insert=(tb_x + 0.2, tb_y + 0.2, 0),
+            height=0.15
+        ).layer = 'A-ANNO-TEXT'
     
-    def _add_reference_grid(self, msp, zones: List[Dict], scale: str):
-        """Add reference grid"""
-        scale_factor = self.scale_factors[scale]
-        
-        bounds = self._calculate_overall_bounds(zones)
-        if not bounds:
-            return
-        
-        min_x, min_y, max_x, max_y = bounds
-        
-        # Scale bounds
-        min_x *= scale_factor
-        min_y *= scale_factor
-        max_x *= scale_factor
-        max_y *= scale_factor
-        
-        # Grid spacing (5m in real units)
-        grid_spacing = 5.0 * scale_factor
-        
-        # Extend grid beyond bounds
-        grid_min_x = math.floor(min_x / grid_spacing) * grid_spacing
-        grid_max_x = math.ceil(max_x / grid_spacing) * grid_spacing
-        grid_min_y = math.floor(min_y / grid_spacing) * grid_spacing
-        grid_max_y = math.ceil(max_y / grid_spacing) * grid_spacing
-        
-        # Add vertical grid lines
-        x = grid_min_x
-        while x <= grid_max_x:
-            msp.add_line(
-                (x, grid_min_y - grid_spacing),
-                (x, grid_max_y + grid_spacing),
-                dxfattribs={'layer': 'GRID'}
-            )
-            x += grid_spacing
-        
-        # Add horizontal grid lines
-        y = grid_min_y
-        while y <= grid_max_y:
-            msp.add_line(
-                (grid_min_x - grid_spacing, y),
-                (grid_max_x + grid_spacing, y),
-                dxfattribs={'layer': 'GRID'}
-            )
-            y += grid_spacing
-        
-        # Add grid labels
-        # Vertical labels
-        x = grid_min_x
-        label_num = 1
-        while x <= grid_max_x:
-            msp.add_text(
-                str(label_num),
-                dxfattribs={
-                    'layer': 'TEXT',
-                    'style': 'NOTES',
-                    'height': 1.5 * scale_factor / 1000,
-                    'halign': 1,
-                    'valign': 2
-                }
-            ).set_pos((x, grid_min_y - grid_spacing/2))
-            x += grid_spacing
-            label_num += 1
-        
-        # Horizontal labels
-        y = grid_min_y
-        label_char = ord('A')
-        while y <= grid_max_y:
-            msp.add_text(
-                chr(label_char),
-                dxfattribs={
-                    'layer': 'TEXT',
-                    'style': 'NOTES',
-                    'height': 1.5 * scale_factor / 1000,
-                    'halign': 1,
-                    'valign': 2
-                }
-            ).set_pos((grid_min_x - grid_spacing/2, y))
-            y += grid_spacing
-            label_char += 1
+    def export_to_svg(self, zones: List[Dict], analysis_results: Dict, output_path: str) -> bool:
+        """Export architectural drawing to SVG format"""
+        try:
+            # Create DXF first
+            temp_dxf = output_path.replace('.svg', '_temp.dxf')
+            if not self.export_to_dxf(zones, analysis_results, temp_dxf):
+                return False
+            
+            # Convert DXF to SVG using matplotlib backend
+            doc = ezdxf.readfile(temp_dxf)
+            msp = doc.modelspace()
+            
+            # Setup matplotlib backend
+            fig = plt.figure(figsize=(16, 12))
+            ax = fig.add_subplot(111)
+            
+            # Create render context
+            ctx = RenderContext(doc)
+            ctx.set_current_layout(msp)
+            
+            # Create matplotlib backend
+            backend = MatplotlibBackend(ax)
+            
+            # Render the drawing
+            Frontend(ctx, backend).draw_layout(msp, finalize=True)
+            
+            # Save as SVG
+            plt.savefig(output_path, format='svg', bbox_inches='tight', 
+                       facecolor='white', edgecolor='none')
+            plt.close(fig)
+            
+            # Clean up temporary file
+            os.remove(temp_dxf)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error exporting to SVG: {e}")
+            return False
     
-    def _calculate_overall_bounds(self, zones: List[Dict]) -> Optional[Tuple[float, float, float, float]]:
-        """Calculate overall bounds of all zones"""
-        if not zones:
-            return None
-        
-        all_points = []
-        for zone in zones:
-            if zone.get('points'):
-                all_points.extend(zone['points'])
-        
-        if not all_points:
-            return None
-        
-        xs = [p[0] for p in all_points]
-        ys = [p[1] for p in all_points]
-        
-        return (min(xs), min(ys), max(xs), max(ys))
+    def export_to_pdf(self, zones: List[Dict], analysis_results: Dict, output_path: str) -> bool:
+        """Export architectural drawing to PDF format"""
+        try:
+            # Create DXF first
+            temp_dxf = output_path.replace('.pdf', '_temp.dxf')
+            if not self.export_to_dxf(zones, analysis_results, temp_dxf):
+                return False
+            
+            # Convert DXF to PDF using matplotlib backend
+            doc = ezdxf.readfile(temp_dxf)
+            msp = doc.modelspace()
+            
+            # Setup matplotlib backend with high DPI for PDF
+            fig = plt.figure(figsize=(11, 8.5))  # Letter size
+            ax = fig.add_subplot(111)
+            
+            # Create render context
+            ctx = RenderContext(doc)
+            ctx.set_current_layout(msp)
+            
+            # Create matplotlib backend
+            backend = MatplotlibBackend(ax)
+            
+            # Render the drawing
+            Frontend(ctx, backend).draw_layout(msp, finalize=True)
+            
+            # Improve the appearance
+            ax.set_aspect('equal')
+            ax.grid(True, alpha=0.3)
+            ax.set_title('Architectural Space Analysis', fontsize=16, fontweight='bold')
+            
+            # Save as PDF
+            plt.savefig(output_path, format='pdf', bbox_inches='tight', 
+                       facecolor='white', edgecolor='none', dpi=300)
+            plt.close(fig)
+            
+            # Clean up temporary file
+            os.remove(temp_dxf)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error exporting to PDF: {e}")
+            return False
     
-    def export_to_svg(self, zones: List[Dict], analysis_results: Dict, 
-                     output_path: str, width: int = 800, height: int = 600) -> str:
-        """Export to SVG format for web display"""
+    def create_drawing_package(self, zones: List[Dict], analysis_results: Dict, 
+                             output_directory: str) -> Dict[str, str]:
+        """Create complete drawing package with multiple formats"""
         
-        # Calculate bounds and scale
-        bounds = self._calculate_overall_bounds(zones)
-        if not bounds:
-            return ""
+        # Ensure output directory exists
+        Path(output_directory).mkdir(parents=True, exist_ok=True)
         
-        min_x, min_y, max_x, max_y = bounds
-        plan_width = max_x - min_x
-        plan_height = max_y - min_y
+        # Base filename
+        base_name = "architectural_analysis"
         
-        # Calculate scale to fit in desired dimensions
-        scale_x = width * 0.8 / plan_width if plan_width > 0 else 1
-        scale_y = height * 0.8 / plan_height if plan_height > 0 else 1
-        scale = min(scale_x, scale_y)
+        # Export to different formats
+        formats = {
+            'dxf': f"{base_name}.dxf",
+            'svg': f"{base_name}.svg", 
+            'pdf': f"{base_name}.pdf"
+        }
         
-        # SVG header
-        svg_content = [
-            f'<?xml version="1.0" encoding="UTF-8"?>',
-            f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">',
-            f'<defs>',
-            f'  <style>',
-            f'    .zone {{ fill: none; stroke: #000; stroke-width: 1; }}',
-            f'    .furniture {{ fill: #90EE90; stroke: #006400; stroke-width: 0.5; }}',
-            f'    .text {{ font-family: Arial; font-size: 12px; fill: #000; }}',
-            f'    .grid {{ stroke: #ccc; stroke-width: 0.5; stroke-dasharray: 2,2; }}',
-            f'  </style>',
-            f'</defs>',
-            f'<g transform="translate({width*0.1}, {height*0.1}) scale({scale}, {-scale}) translate({-min_x}, {-max_y})">'
-        ]
+        exported_files = {}
         
-        # Add zones
-        rooms = analysis_results.get('rooms', {})
-        for i, zone in enumerate(zones):
-            if not zone.get('points'):
-                continue
+        for format_name, filename in formats.items():
+            output_path = os.path.join(output_directory, filename)
             
-            points_str = ' '.join([f"{p[0]},{p[1]}" for p in zone['points']])
-            svg_content.append(f'  <polygon points="{points_str}" class="zone"/>')
+            if format_name == 'dxf':
+                success = self.export_to_dxf(zones, analysis_results, output_path,
+                                           include_dimensions=True,
+                                           include_furniture=True,
+                                           include_title_block=True)
+            elif format_name == 'svg':
+                success = self.export_to_svg(zones, analysis_results, output_path)
+            elif format_name == 'pdf':
+                success = self.export_to_pdf(zones, analysis_results, output_path)
             
-            # Add zone label
-            zone_name = f"Zone_{i}"
-            room_info = rooms.get(zone_name, {})
-            poly = Polygon(zone['points'])
-            centroid = poly.centroid
-            
-            room_type = room_info.get('type', 'Unknown')
-            svg_content.append(
-                f'  <text x="{centroid.x}" y="{centroid.y}" class="text" '
-                f'text-anchor="middle" transform="scale(1,-1)">{room_type}</text>'
-            )
+            if success:
+                exported_files[format_name] = output_path
+            else:
+                print(f"Failed to export {format_name} format")
         
-        # Add furniture
-        if analysis_results.get('placements'):
-            for zone_placements in analysis_results['placements'].values():
-                for placement in zone_placements:
-                    points_str = ' '.join([f"{p[0]},{p[1]}" for p in placement['box_coords']])
-                    svg_content.append(f'  <polygon points="{points_str}" class="furniture"/>')
+        # Create summary JSON
+        summary = {
+            'exported_files': exported_files,
+            'analysis_summary': {
+                'total_zones': len(zones),
+                'total_area': sum(zone.get('area', 0) for zone in zones),
+                'room_types': list(set(
+                    analysis_results.get('rooms', {}).get(i, {}).get('type', 'Unknown')
+                    for i in range(len(zones))
+                ))
+            },
+            'export_timestamp': str(plt.datetime.datetime.now()),
+            'software': 'AI Architectural Space Analyzer Pro'
+        }
         
-        svg_content.extend([
-            '</g>',
-            '</svg>'
-        ])
+        summary_path = os.path.join(output_directory, 'export_summary.json')
+        with open(summary_path, 'w') as f:
+            json.dump(summary, f, indent=2)
         
-        # Write to file
-        with open(output_path, 'w') as f:
-            f.write('\n'.join(svg_content))
+        exported_files['summary'] = summary_path
         
-        return output_path
-    
-    def export_3d_model(self, zones: List[Dict], analysis_results: Dict,
-                       output_path: str, format: str = 'OBJ') -> str:
-        """Export 3D model in OBJ or STL format"""
-        
-        if format.upper() not in ['OBJ', 'STL']:
-            raise ValueError("Supported 3D formats: OBJ, STL")
-        
-        vertices = []
-        faces = []
-        vertex_count = 0
-        
-        # Default heights
-        floor_height = 0.1  # 10cm floor thickness
-        wall_height = 3.0   # 3m wall height
-        furniture_height = 0.75  # 75cm furniture height
-        
-        # Add floor and walls for each zone
-        for zone in zones:
-            if not zone.get('points'):
-                continue
-            
-            points = zone['points']
-            
-            # Floor vertices (bottom)
-            floor_vertices_bottom = []
-            for point in points:
-                vertices.append((point[0], point[1], 0))
-                floor_vertices_bottom.append(vertex_count)
-                vertex_count += 1
-            
-            # Floor vertices (top)
-            floor_vertices_top = []
-            for point in points:
-                vertices.append((point[0], point[1], floor_height))
-                floor_vertices_top.append(vertex_count)
-                vertex_count += 1
-            
-            # Create floor faces
-            for i in range(len(points) - 1):
-                # Bottom face (reversed for correct normal)
-                faces.append([floor_vertices_bottom[i+1], floor_vertices_bottom[i], floor_vertices_bottom[0]])
-                
-                # Top face
-                faces.append([floor_vertices_top[i], floor_vertices_top[i+1], floor_vertices_top[0]])
-                
-                # Side faces
-                faces.append([
-                    floor_vertices_bottom[i], floor_vertices_bottom[i+1],
-                    floor_vertices_top[i+1], floor_vertices_top[i]
-                ])
-            
-            # Wall vertices
-            wall_vertices_bottom = floor_vertices_top[:]
-            wall_vertices_top = []
-            for point in points:
-                vertices.append((point[0], point[1], wall_height))
-                wall_vertices_top.append(vertex_count)
-                vertex_count += 1
-            
-            # Create wall faces (exterior walls only)
-            for i in range(len(points) - 1):
-                faces.append([
-                    wall_vertices_bottom[i], wall_vertices_bottom[i+1],
-                    wall_vertices_top[i+1], wall_vertices_top[i]
-                ])
-        
-        # Add furniture as 3D boxes
-        if analysis_results.get('placements'):
-            for zone_placements in analysis_results['placements'].values():
-                for placement in zone_placements:
-                    coords = placement['box_coords']
-                    
-                    # Create 3D box for furniture
-                    box_vertices = []
-                    
-                    # Bottom vertices
-                    for coord in coords:
-                        vertices.append((coord[0], coord[1], floor_height))
-                        box_vertices.append(vertex_count)
-                        vertex_count += 1
-                    
-                    # Top vertices
-                    for coord in coords:
-                        vertices.append((coord[0], coord[1], floor_height + furniture_height))
-                        box_vertices.append(vertex_count)
-                        vertex_count += 1
-                    
-                    # Create box faces
-                    # Bottom face
-                    faces.append([box_vertices[0], box_vertices[1], box_vertices[2], box_vertices[3]])
-                    
-                    # Top face
-                    faces.append([box_vertices[4], box_vertices[7], box_vertices[6], box_vertices[5]])
-                    
-                    # Side faces
-                    faces.append([box_vertices[0], box_vertices[4], box_vertices[5], box_vertices[1]])
-                    faces.append([box_vertices[1], box_vertices[5], box_vertices[6], box_vertices[2]])
-                    faces.append([box_vertices[2], box_vertices[6], box_vertices[7], box_vertices[3]])
-                    faces.append([box_vertices[3], box_vertices[7], box_vertices[4], box_vertices[0]])
-        
-        # Write OBJ file
-        if format.upper() == 'OBJ':
-            with open(output_path, 'w') as f:
-                f.write("# AI Architectural Space Analyzer - 3D Export\n")
-                f.write(f"# Generated: {datetime.now().isoformat()}\n\n")
-                
-                # Write vertices
-                for vertex in vertices:
-                    f.write(f"v {vertex[0]} {vertex[1]} {vertex[2]}\n")
-                
-                f.write("\n")
-                
-                # Write faces (OBJ uses 1-based indexing)
-                for face in faces:
-                    if len(face) == 3:
-                        f.write(f"f {face[0]+1} {face[1]+1} {face[2]+1}\n")
-                    elif len(face) == 4:
-                        f.write(f"f {face[0]+1} {face[1]+1} {face[2]+1} {face[3]+1}\n")
-        
-        return output_path
-    
-    def create_technical_drawing_package(self, zones: List[Dict], analysis_results: Dict,
-                                       output_dir: str) -> Dict[str, str]:
-        """Create complete technical drawing package"""
-        
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        
-        package_files = {}
-        
-        # Floor plan (DXF)
-        floor_plan_path = os.path.join(output_dir, "floor_plan.dxf")
-        self.export_to_dxf(zones, analysis_results, floor_plan_path, 
-                          include_furniture=True, include_dimensions=True)
-        package_files['floor_plan_dxf'] = floor_plan_path
-        
-        # Furniture plan (DXF)
-        furniture_plan_path = os.path.join(output_dir, "furniture_plan.dxf")
-        self.export_to_dxf(zones, analysis_results, furniture_plan_path,
-                          include_furniture=True, include_dimensions=False)
-        package_files['furniture_plan_dxf'] = furniture_plan_path
-        
-        # Dimensions plan (DXF)
-        dimensions_plan_path = os.path.join(output_dir, "dimensions_plan.dxf")
-        self.export_to_dxf(zones, analysis_results, dimensions_plan_path,
-                          include_furniture=False, include_dimensions=True)
-        package_files['dimensions_plan_dxf'] = dimensions_plan_path
-        
-        # Web preview (SVG)
-        svg_preview_path = os.path.join(output_dir, "preview.svg")
-        self.export_to_svg(zones, analysis_results, svg_preview_path)
-        package_files['svg_preview'] = svg_preview_path
-        
-        # 3D model (OBJ)
-        model_3d_path = os.path.join(output_dir, "model_3d.obj")
-        self.export_3d_model(zones, analysis_results, model_3d_path)
-        package_files['3d_model_obj'] = model_3d_path
-        
-        # Analysis report (JSON)
-        report_path = os.path.join(output_dir, "analysis_report.json")
-        with open(report_path, 'w') as f:
-            json.dump({
-                'export_date': datetime.now().isoformat(),
-                'zones_count': len(zones),
-                'analysis_results': analysis_results,
-                'package_contents': list(package_files.keys())
-            }, f, indent=2)
-        package_files['analysis_report'] = report_path
-        
-        return package_files
+        return exported_files
