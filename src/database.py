@@ -175,9 +175,26 @@ class DatabaseManager:
     """
     
     def __init__(self):
-        self.engine = create_engine(DATABASE_URL)
-        Base.metadata.create_all(self.engine)
-        self.Session = sessionmaker(bind=self.engine)
+        DATABASE_URL = os.environ.get('DATABASE_URL')
+        if not DATABASE_URL:
+            # Use SQLite as fallback for deployment
+            DATABASE_URL = "sqlite:///dwg_analyzer.db"
+            import streamlit as st
+            st.info("Using SQLite database (PostgreSQL not configured)")
+        
+        try:
+            self.engine = create_engine(DATABASE_URL)
+            Base.metadata.create_all(self.engine)
+            self.Session = sessionmaker(bind=self.engine)
+        except Exception as e:
+            import streamlit as st
+            st.error(f"Database connection error: {str(e)}")
+            # Fallback to in-memory SQLite
+            DATABASE_URL = "sqlite:///:memory:"
+            self.engine = create_engine(DATABASE_URL)
+            Base.metadata.create_all(self.engine)
+            self.Session = sessionmaker(bind=self.engine)
+            st.warning("Using in-memory database as fallback")
     
     def get_session(self):
         """Get database session"""
