@@ -66,6 +66,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Performance optimization
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def get_cached_zones():
+    return st.session_state.get('zones', [])
+
 # Add responsive CSS
 st.markdown("""
 <style>
