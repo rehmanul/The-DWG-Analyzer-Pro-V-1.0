@@ -48,13 +48,7 @@ except ImportError:
         def build_space_graph(self, zones, analysis): return {}
         def analyze_spatial_relationships(self): return {}
     
-    class OptimizationEngine:
-        def optimize_layout(self, zones, params): 
-            return {'total_efficiency': 0.85}
-        
-        def optimize_furniture_placement(self, zones, furniture_params):
-            """Optimize furniture placement in zones"""
-            return {'total_efficiency': 0.85, 'placements': {}}
+    
     
     class CADExporter:
         def export_to_dxf(self, zones, results, path, **kwargs): pass
