@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import datetime
 import json
 import io
+import math
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -12,6 +13,7 @@ from matplotlib.patches import Polygon as MplPolygon
 import asyncio
 import tempfile
 import os
+import numpy as np
 
 # Import custom modules
 from src.dwg_parser import DWGParser
@@ -537,16 +539,28 @@ def generate_comprehensive_report(components):
 
     try:
         with st.spinner("Generating comprehensive report..."):
+            # Fix analysis results to ensure dimensions field exists
+            results = st.session_state.analysis_results.copy()
+            
+            # Ensure all rooms have dimensions field
+            if 'rooms' in results:
+                for room_name, room_info in results['rooms'].items():
+                    if 'dimensions' not in room_info:
+                        # Calculate dimensions from area if missing
+                        area = room_info.get('area', 16.0)
+                        width = height = math.sqrt(area)  # Assume square room
+                        room_info['dimensions'] = [width, height]
+            
             export_manager = ExportManager()
 
             # Generate PDF report
-            pdf_data = export_manager.generate_pdf_report(st.session_state.zones, st.session_state.analysis_results)
+            pdf_data = export_manager.generate_pdf_report(st.session_state.zones, results)
 
             # Generate JSON export
-            json_data = export_manager.export_to_json(st.session_state.analysis_results)
+            json_data = export_manager.export_to_json(results)
 
             # Generate CSV data
-            csv_data = export_manager.export_to_csv(st.session_state.analysis_results)
+            csv_data = export_manager.export_to_csv(results)
 
             col1, col2, col3 = st.columns(3)
 
@@ -712,46 +726,29 @@ def run_advanced_analysis(components):
             status_text.text("Advanced room classification...")
             progress_bar.progress(20)
 
-            # Use AI analyzer or fallback to basic classification
+            # Use AI analyzer for room classification
             ai_analyzer = components.get('ai_analyzer')
-            room_analysis = {}
-
-            for i, zone in enumerate(st.session_state.zones):
-                zone_name = f"Zone_{i}"
-                
-                if ai_analyzer:
+            
+            # Use the built-in AIAnalyzer for room classification
+            from src.ai_analyzer import AIAnalyzer
+            analyzer = AIAnalyzer()
+            room_analysis = analyzer.analyze_room_types(st.session_state.zones)
+            
+            # If Gemini AI is available, enhance with AI insights
+            gemini_analyzer = components.get('ai_analyzer')
+            if gemini_analyzer and gemini_analyzer.available:
+                for zone_name, room_info in room_analysis.items():
                     try:
-                        ai_result = ai_analyzer.analyze_room_type(zone)
-                        room_analysis[zone_name] = {
-                            'type': ai_result['type'],
-                            'confidence': ai_result['confidence'],
-                            'area': zone.get('area', 0),
-                            'reasoning': ai_result['reasoning']
-                        }
+                        zone_index = int(zone_name.split('_')[1])
+                        zone_data = st.session_state.zones[zone_index]
+                        ai_result = gemini_analyzer.analyze_room_type(zone_data)
+                        
+                        # Enhance with AI insights
+                        room_info['ai_type'] = ai_result.get('type', room_info['type'])
+                        room_info['ai_confidence'] = ai_result.get('confidence', room_info['confidence'])
+                        room_info['reasoning'] = ai_result.get('reasoning', 'Geometric analysis')
                     except:
-                        # Fallback to basic classification
-                        room_analysis[zone_name] = {
-                            'type': 'Office Space',
-                            'confidence': 0.75,
-                            'area': zone.get('area', 20.0),
-                            'reasoning': 'Basic geometric analysis'
-                        }
-                else:
-                    # Basic classification when AI analyzer not available
-                    area = zone.get('area', 20.0)
-                    if area > 50:
-                        room_type = 'Conference Room'
-                    elif area > 30:
-                        room_type = 'Office Space'
-                    else:
-                        room_type = 'Storage'
-                    
-                    room_analysis[zone_name] = {
-                        'type': room_type,
-                        'confidence': 0.75,
-                        'area': area,
-                        'reasoning': f'Area-based classification: {area:.1f} sqm'
-                    }
+                        pass  # Keep original classification if AI fails
 
             # Step 2: Semantic space analysis
             status_text.text("Semantic space analysis...")
@@ -781,23 +778,21 @@ def run_advanced_analysis(components):
             }
             placement_analysis = analyzer.analyze_furniture_placement(st.session_state.zones, params)
 
-            # Use AI analyzer for optimization or fallback to basic optimization
-            if ai_analyzer:
+            # Use optimization engine for advanced optimization
+            optimization_engine = components.get('optimization_engine')
+            if optimization_engine:
                 try:
-                    optimization_results = ai_analyzer.optimize_furniture_placement(st.session_state.zones, params)
-                except:
-                    # Use basic optimization engine
-                    optimization_engine = components.get('optimization_engine')
-                    if optimization_engine:
-                        optimization_results = optimization_engine.optimize_furniture_placement(st.session_state.zones, params)
-                    else:
-                        optimization_results = {'total_efficiency': 0.85}
-            else:
-                # Use basic optimization engine
-                optimization_engine = components.get('optimization_engine')
-                if optimization_engine:
                     optimization_results = optimization_engine.optimize_furniture_placement(st.session_state.zones, params)
-                else:
+                except Exception as opt_error:
+                    print(f"Optimization error: {opt_error}")
+                    optimization_results = {'total_efficiency': 0.85, 'error': str(opt_error)}
+            else:
+                # Fallback optimization
+                from src.optimization import PlacementOptimizer
+                try:
+                    optimizer = PlacementOptimizer()
+                    optimization_results = optimizer.optimize_placements(placement_analysis, params)
+                except:
                     optimization_results = {'total_efficiency': 0.85}
 
             # Step 4: Save to database

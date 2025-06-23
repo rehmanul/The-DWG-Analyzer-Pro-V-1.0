@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 
 class CADExporter:
     """Professional CAD export functionality for architectural drawings"""
-    
+
     def __init__(self):
         self.supported_formats = ['dxf', 'svg', 'pdf', 'dwg']
         self.export_settings = {
@@ -28,45 +28,45 @@ class CADExporter:
                 'text': colors.BLACK
             }
         }
-    
+
     def export_to_dxf(self, zones: List[Dict], results: Dict, output_path: str, **kwargs) -> str:
         """Export analysis results to DXF format"""
-        
+
         # Create new DXF document
         doc = ezdxf.new('R2010')
         doc.units = ezdxf.units.M  # Set units to meters
-        
+
         # Get modelspace
         msp = doc.modelspace()
-        
+
         # Create layers
         self._create_layers(doc)
-        
+
         # Export zones (rooms)
         self._export_zones_to_dxf(msp, zones, results)
-        
+
         # Export furniture/equipment placements
         if 'placements' in results:
             self._export_placements_to_dxf(msp, results['placements'])
-        
+
         # Export room labels and dimensions
         self._export_annotations_to_dxf(msp, zones, results)
-        
+
         # Add title block
         self._add_title_block_dxf(msp, results)
-        
+
         # Save file
         doc.saveas(output_path)
         return output_path
-    
+
     def export_to_svg(self, zones: List[Dict], results: Dict, output_path: str) -> str:
         """Export analysis results to SVG format"""
-        
+
         # Calculate drawing bounds
         bounds = self._calculate_bounds(zones)
         width = bounds['max_x'] - bounds['min_x']
         height = bounds['max_y'] - bounds['min_y']
-        
+
         # Create SVG content
         svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <svg width="{width * 100}" height="{height * 100}" viewBox="{bounds['min_x']} {bounds['min_y']} {width} {height}" 
@@ -80,73 +80,73 @@ class CADExporter:
         </style>
     </defs>
 '''
-        
+
         # Export zones
         for i, zone in enumerate(zones):
             if 'points' in zone:
                 points_str = ' '.join([f"{p[0]},{p[1]}" for p in zone['points']])
                 svg_content += f'    <polygon points="{points_str}" class="room-boundary"/>\n'
-                
+
                 # Add room label
                 centroid = self._calculate_centroid(zone['points'])
                 room_type = results.get('room_analysis', {}).get(str(i), {}).get('room_type', 'Unknown')
                 svg_content += f'    <text x="{centroid[0]}" y="{centroid[1]}" class="room-label">{room_type}</text>\n'
-        
+
         # Export furniture placements
         if 'placements' in results:
             for placement in results['placements']:
                 x, y = placement.get('position', {}).get('x', 0), placement.get('position', {}).get('y', 0)
                 w, h = placement.get('dimensions', {}).get('width', 1), placement.get('dimensions', {}).get('height', 1)
                 svg_content += f'    <rect x="{x-w/2}" y="{y-h/2}" width="{w}" height="{h}" class="furniture"/>\n'
-        
+
         svg_content += '</svg>'
-        
+
         # Save file
         with open(output_path, 'w') as f:
             f.write(svg_content)
-        
+
         return output_path
-    
+
     def export_to_pdf(self, zones: List[Dict], results: Dict, output_path: str) -> str:
         """Export analysis results to PDF format"""
         from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
-        
+
         c = canvas.Canvas(output_path, pagesize=A4)
-        
+
         # Calculate scale to fit page
         bounds = self._calculate_bounds(zones)
         page_width, page_height = A4
         margin = 20 * mm
-        
+
         drawing_width = page_width - 2 * margin
         drawing_height = page_height - 2 * margin - 60 * mm  # Space for title and legend
-        
+
         zone_width = bounds['max_x'] - bounds['min_x']
         zone_height = bounds['max_y'] - bounds['min_y']
-        
+
         scale_x = drawing_width / zone_width if zone_width > 0 else 1
         scale_y = drawing_height / zone_height if zone_height > 0 else 1
         scale = min(scale_x, scale_y) * 0.8  # 80% of available space
-        
+
         # Transform coordinates
         def transform_point(x, y):
             tx = margin + (x - bounds['min_x']) * scale
             ty = page_height - margin - 40 * mm - (y - bounds['min_y']) * scale
             return tx, ty
-        
+
         # Draw title
         c.setFont("Helvetica-Bold", 16)
         c.drawString(margin, page_height - margin, "Architectural Space Analysis Report")
-        
+
         c.setFont("Helvetica", 10)
         c.drawString(margin, page_height - margin - 20, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        
+
         # Draw zones
         c.setStrokeColor('black')
         c.setLineWidth(1)
-        
+
         for i, zone in enumerate(zones):
             if 'points' in zone and len(zone['points']) > 2:
                 # Draw room boundary
@@ -157,17 +157,17 @@ class CADExporter:
                     path.lineTo(*point)
                 path.close()
                 c.drawPath(path)
-                
+
                 # Add room label
                 centroid = self._calculate_centroid(zone['points'])
                 tx, ty = transform_point(centroid[0], centroid[1])
                 room_type = results.get('room_analysis', {}).get(str(i), {}).get('room_type', 'Unknown')
                 area = zone.get('area', 0)
-                
+
                 c.setFont("Helvetica", 8)
                 c.drawCentredText(tx, ty + 5, room_type)
                 c.drawCentredText(tx, ty - 5, f"{area:.1f} m²")
-        
+
         # Draw furniture placements
         if 'placements' in results:
             c.setFillColor('green')
@@ -178,70 +178,70 @@ class CADExporter:
                 if pos and dims:
                     x, y = pos.get('x', 0), pos.get('y', 0)
                     w, h = dims.get('width', 1), dims.get('height', 1)
-                    
+
                     # Transform furniture rectangle
                     x1, y1 = transform_point(x - w/2, y - h/2)
                     x2, y2 = transform_point(x + w/2, y + h/2)
-                    
+
                     c.rect(x1, y2, x2-x1, y1-y2, fill=1, stroke=1)
-        
+
         # Add statistics
         stats_y = 100
         c.setFont("Helvetica-Bold", 12)
         c.drawString(margin, stats_y, "Analysis Summary:")
-        
+
         c.setFont("Helvetica", 10)
         total_area = sum(zone.get('area', 0) for zone in zones)
         total_boxes = results.get('total_boxes', 0)
         efficiency = results.get('optimization', {}).get('total_efficiency', 0) * 100
-        
+
         c.drawString(margin, stats_y - 20, f"Total Area: {total_area:.1f} m²")
         c.drawString(margin, stats_y - 35, f"Equipment Placed: {total_boxes}")
         c.drawString(margin, stats_y - 50, f"Space Efficiency: {efficiency:.1f}%")
-        
+
         c.save()
         return output_path
-    
+
     def create_export_package(self, zones: List[Dict], results: Dict, 
                             formats: List[str] = None) -> str:
         """Create a comprehensive export package with multiple formats"""
-        
+
         if formats is None:
             formats = ['dxf', 'svg', 'pdf']
-        
+
         # Create temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
             package_files = []
-            
+
             # Export in each requested format
             for fmt in formats:
                 if fmt in self.supported_formats:
                     filename = f"architectural_analysis.{fmt}"
                     filepath = os.path.join(temp_dir, filename)
-                    
+
                     if fmt == 'dxf':
                         self.export_to_dxf(zones, results, filepath)
                     elif fmt == 'svg':
                         self.export_to_svg(zones, results, filepath)
                     elif fmt == 'pdf':
                         self.export_to_pdf(zones, results, filepath)
-                    
+
                     package_files.append(filepath)
-            
+
             # Add analysis report
             report_path = os.path.join(temp_dir, "analysis_report.json")
             with open(report_path, 'w') as f:
                 json.dump(results, f, indent=2, default=str)
             package_files.append(report_path)
-            
+
             # Create zip package
             package_path = "architectural_analysis_package.zip"
             with zipfile.ZipFile(package_path, 'w') as zipf:
                 for file_path in package_files:
                     zipf.write(file_path, os.path.basename(file_path))
-            
+
             return package_path
-    
+
     def _create_layers(self, doc):
         """Create standard architectural layers"""
         layers = [
@@ -253,10 +253,10 @@ class CADExporter:
             ('TEXT', colors.BLACK),
             ('EQUIPMENT', colors.MAGENTA)
         ]
-        
+
         for layer_name, color in layers:
             doc.layers.new(layer_name, dxfattribs={'color': color})
-    
+
     def _export_zones_to_dxf(self, msp: Modelspace, zones: List[Dict], results: Dict):
         """Export room zones to DXF"""
         for i, zone in enumerate(zones):
@@ -264,7 +264,7 @@ class CADExporter:
                 # Create room boundary
                 points_3d = [(p[0], p[1], 0) for p in zone['points']]
                 msp.add_lwpolyline(points_3d, close=True, dxfattribs={'layer': 'WALLS'})
-    
+
     def _export_placements_to_dxf(self, msp: Modelspace, placements: List[Dict]):
         """Export equipment placements to DXF"""
         for placement in placements:
@@ -273,7 +273,7 @@ class CADExporter:
             if pos and dims:
                 x, y = pos.get('x', 0), pos.get('y', 0)
                 w, h = dims.get('width', 1), dims.get('height', 1)
-                
+
                 # Create rectangle for equipment
                 points = [
                     (x - w/2, y - h/2, 0),
@@ -282,7 +282,7 @@ class CADExporter:
                     (x - w/2, y + h/2, 0)
                 ]
                 msp.add_lwpolyline(points, close=True, dxfattribs={'layer': 'EQUIPMENT'})
-    
+
     def _export_annotations_to_dxf(self, msp: Modelspace, zones: List[Dict], results: Dict):
         """Export text annotations and dimensions to DXF"""
         for i, zone in enumerate(zones):
@@ -290,7 +290,7 @@ class CADExporter:
                 centroid = self._calculate_centroid(zone['points'])
                 room_type = results.get('room_analysis', {}).get(str(i), {}).get('room_type', 'Unknown')
                 area = zone.get('area', 0)
-                
+
                 # Add room type label
                 msp.add_text(
                     room_type,
@@ -299,7 +299,7 @@ class CADExporter:
                         'height': self.export_settings['text_height']
                     }
                 ).set_pos((centroid[0], centroid[1] + 1, 0))
-                
+
                 # Add area label
                 msp.add_text(
                     f"{area:.1f} m²",
@@ -308,13 +308,13 @@ class CADExporter:
                         'height': self.export_settings['text_height'] * 0.8
                     }
                 ).set_pos((centroid[0], centroid[1] - 1, 0))
-    
+
     def _add_title_block_dxf(self, msp: Modelspace, results: Dict):
         """Add title block to DXF"""
         # Simple title block
         title_text = "Architectural Space Analysis"
         date_text = datetime.now().strftime("%Y-%m-%d")
-        
+
         msp.add_text(
             title_text,
             dxfattribs={
@@ -322,7 +322,7 @@ class CADExporter:
                 'height': self.export_settings['text_height'] * 2
             }
         ).set_pos((0, -5, 0))
-        
+
         msp.add_text(
             date_text,
             dxfattribs={
@@ -330,79 +330,66 @@ class CADExporter:
                 'height': self.export_settings['text_height']
             }
         ).set_pos((0, -8, 0))
-    
+
     def _calculate_bounds(self, zones: List[Dict]) -> Dict:
         """Calculate bounding box for all zones"""
         all_points = []
         for zone in zones:
             if 'points' in zone:
                 all_points.extend(zone['points'])
-        
+
         if not all_points:
             return {'min_x': 0, 'min_y': 0, 'max_x': 10, 'max_y': 10}
-        
+
         x_coords = [p[0] for p in all_points]
         y_coords = [p[1] for p in all_points]
-        
+
         return {
             'min_x': min(x_coords),
             'min_y': min(y_coords),
             'max_x': max(x_coords),
             'max_y': max(y_coords)
         }
-    
+
     def _calculate_centroid(self, points: List[tuple]) -> tuple:
         """Calculate centroid of polygon"""
         if not points:
             return (0, 0)
-        
+
         x = sum(p[0] for p in points) / len(points)
         y = sum(p[1] for p in points) / len(points)
         return (x, y)
-    
-    def create_technical_drawing_package(self, zones: List[Dict], results: Dict, 
-                                       output_dir: str = "exports") -> Dict[str, str]:
-        """Create a complete technical drawing package with multiple formats"""
-        
-        # Create output directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
-        
+
+    def generate_drawing_package(self, zones: List[Dict], analysis_results: Dict, 
+                                  output_dir: str) -> Dict[str, str]:
+        """Generate complete technical drawing package"""
         package_files = {}
-        
+
         try:
-            # Export to DXF
-            dxf_path = os.path.join(output_dir, "architectural_analysis.dxf")
-            self.export_to_dxf(zones, results, dxf_path)
-            package_files['dxf'] = dxf_path
-            
-            # Export to SVG
-            svg_path = os.path.join(output_dir, "architectural_analysis.svg")
-            self.export_to_svg(zones, results, svg_path)
-            package_files['svg'] = svg_path
-            
-            # Export to PDF
-            pdf_path = os.path.join(output_dir, "architectural_analysis.pdf")
-            self.export_to_pdf(zones, results, pdf_path)
-            package_files['pdf'] = pdf_path
-            
-            # Create analysis report
-            report_path = os.path.join(output_dir, "analysis_report.json")
-            with open(report_path, 'w') as f:
-                json.dump(results, f, indent=2, default=str)
-            package_files['report'] = report_path
-            
-            return package_files
-            
+            # Plan view DXF
+            plan_path = os.path.join(output_dir, "architectural_plan.dxf")
+            self.export_to_dxf(zones, analysis_results, plan_path)
+            package_files['plan_dxf'] = plan_path
+
+            # Preview SVG
+            preview_path = os.path.join(output_dir, "plan_preview.svg")
+            self.export_to_svg(zones, analysis_results, preview_path)
+            package_files['preview_svg'] = preview_path
+
+            # 3D Model (if available)
+            model_path = os.path.join(output_dir, "3d_model.obj")
+            try:
+                self.export_to_3d_model(zones, analysis_results, model_path)
+                package_files['3d_model'] = model_path
+            except:
+                pass  # 3D export is optional
+
         except Exception as e:
-            # Return basic package with error information
-            error_report = {
-                'error': str(e),
-                'zones_count': len(zones),
-                'results_available': bool(results)
-            }
-            
-            error_path = os.path.join(output_dir, "export_error.json")
-            with open(error_path, 'w') as f:
-                json.dump(error_report, f, indent=2)
-            
-            return {'error_report': error_path}
+            print(f"Drawing package generation error: {e}")
+
+        return package_files
+
+    def create_technical_drawing_package(self, zones: List[Dict], analysis_results: Dict, 
+                                       output_dir: str) -> Dict[str, str]:
+        """Create comprehensive technical drawing package"""
+        return self.generate_drawing_package(zones, analysis_results, output_dir)
