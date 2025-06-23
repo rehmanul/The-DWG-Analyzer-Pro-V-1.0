@@ -34,7 +34,10 @@ class DWGParser:
             temp_file_path = temp_file.name
         
         try:
-            # Try to read the DXF/DWG file
+            if filename.lower().endswith('.dwg'):
+                raise Exception("DWG files are not directly supported. Please convert to DXF format first.")
+            
+            # Try to read the DXF file
             try:
                 doc = ezdxf.readfile(temp_file_path)
             except ezdxf.DXFStructureError:

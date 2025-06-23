@@ -17,8 +17,9 @@ from datetime import datetime
 
 # Import custom modules
 from src.dwg_parser import DWGParser
+from src.pdf_parser import PDFParser
 from src.ai_analyzer import AIAnalyzer
-from src.visualization import PlanVisualizer
+from src.visualization_new import PlanVisualizer
 from src.export_utils import ExportManager
 from src.optimization import PlacementOptimizer
 
@@ -64,7 +65,6 @@ except ImportError:
         def export_to_svg(self, zones, results, path): pass
     class CollaborationManager: pass
     class MultiFloorAnalyzer: pass
-    class FloorPlan: pass
 
 # Configure page
 st.set_page_config(
@@ -289,14 +289,14 @@ def display_welcome_screen():
     with st.expander("Getting Started Guide"):
         st.markdown("""
         ### Quick Start (Standard Mode)
-        1. Upload your DWG/DXF file
+        1. Upload your DXF file (Note: DWG files need to be converted to DXF format first)
         2. Configure box dimensions and parameters
         3. Run AI analysis
         4. Review results and export reports
 
         ### Professional Workflow (Advanced Mode)
         1. **Project Setup**: Choose project type (single floor, multi-floor, BIM, collaborative)
-        2. **File Upload**: Upload single or multiple architectural files
+        2. **File Upload**: Upload single or multiple DXF files
         3. **Advanced Configuration**: Select AI models, BIM standards, sustainability preferences
         4. **Comprehensive Analysis**: Run advanced AI analysis with multiple algorithms
         5. **BIM Integration**: Generate IFC-compliant building models
@@ -677,7 +677,7 @@ def load_multiple_dwg_files(uploaded_files):
                 parser = DWGParser()
                 zones = parser.parse_file(file_bytes, file.name)
 
-                # Create floor plan object
+                # Create floor plan object with all required fields
                 floor_plan = FloorPlan(
                     floor_id=f"floor_{i}",
                     floor_number=i + 1,
@@ -982,11 +982,12 @@ def main():
                 setup_collaboration_project()
 
         # Enhanced file upload with better error handling
+        st.warning("⚠️ Note: DWG files must be converted to DXF format before uploading")
         uploaded_file = st.file_uploader(
-            "Choose DWG/DXF files",
-            type=['dwg', 'dxf'],
+            "Choose DXF or PDF files",
+            type=['dxf', 'pdf'],
             accept_multiple_files=st.session_state.advanced_mode,
-            help="Upload architectural plan files for analysis (Max 200MB per file)"
+            help="Upload architectural plan files in DXF format. DWG files need to be converted to DXF before uploading. Maximum file size: 200MB"
         )
 
         if uploaded_file is not None:
@@ -1009,7 +1010,10 @@ def main():
                         if file_size_mb > 200:
                             st.error("File too large. Maximum size is 200MB.")
                         else:
-                            load_dwg_file(uploaded_file)
+                            if uploaded_file.type == "application/pdf":
+                                load_pdf_file(uploaded_file)
+                            else:
+                                load_dwg_file(uploaded_file)
             except Exception as e:
                 st.error(f"File handling error: {str(e)}")
 
@@ -1146,6 +1150,28 @@ def load_dwg_file(uploaded_file):
             st.error(f"❌ Error loading DWG file: {error_msg}")
 
         st.info("💡 Try these solutions:\n- Use a smaller file (under 200MB)\n- Ensure the file is a valid DWG/DXF format\n- Try refreshing the page and uploading again")
+
+def load_pdf_file(uploaded_file):
+    """Load and parse PDF file"""
+    try:
+        with st.spinner("🔄 Loading and parsing PDF file..."):
+            file_bytes = uploaded_file.read()
+            parser = PDFParser()
+            zones = parser.parse_file(file_bytes, uploaded_file.name)
+
+            if not zones:
+                st.warning("No valid zones found in the PDF file. Please check if the file contains vector shapes or room boundaries.")
+                return
+
+            st.session_state.zones = zones
+            st.session_state.dwg_loaded = True
+
+            st.success(f"✅ Successfully loaded {len(zones)} zones from {uploaded_file.name}")
+            st.rerun()
+
+    except Exception as e:
+        st.error(f"❌ Error loading PDF file: {str(e)}")
+
 
 # Keep existing functions for backward compatibility
 def run_ai_analysis(box_length, box_width, margin, confidence_threshold, enable_rotation, smart_spacing):
@@ -1327,7 +1353,7 @@ def display_statistics():
         else:
             fig_bar = go.Figure()
             fig_bar.update_layout(title="No placement data available")
-        fig_bar.update_xaxis(tickangle=45)
+            fig_bar.update_layout(xaxis=dict(tickangle=45))
         st.plotly_chart(fig_bar, use_container_width=True)
 
     # Efficiency metrics

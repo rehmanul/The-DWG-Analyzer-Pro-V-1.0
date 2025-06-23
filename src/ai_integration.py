@@ -1,7 +1,6 @@
 import os
 import json
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 import numpy as np
 from typing import Dict, List, Any
 
@@ -9,7 +8,8 @@ class GeminiAIAnalyzer:
     """Gemini AI integration for architectural analysis"""
     
     def __init__(self):
-        self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        self.model = genai.GenerativeModel('gemini-pro')
     
     def analyze_room_type(self, zone_data: Dict) -> Dict:
         """Analyze room type using Gemini AI"""
@@ -25,14 +25,13 @@ class GeminiAIAnalyzer:
             Based on these architectural measurements, classify this room type and provide confidence score.
             """
             
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[
-                    types.Content(role="user", parts=[types.Part(text=zone_description)])
-                ],
-                config=types.GenerateContentConfig(
-                    system_instruction="You are an expert architectural analyst. Classify rooms based on dimensions and provide confidence scores between 0-1.",
-                    response_mime_type="application/json",
+            response = self.model.generate_content(
+                contents=zone_description,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    top_p=1,
+                    top_k=1,
+                    max_output_tokens=2048
                 )
             )
             
@@ -109,9 +108,14 @@ class GeminiAIAnalyzer:
             Provide optimization strategy and efficiency score.
             """
             
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=optimization_prompt
+            response = self.model.generate_content(
+                contents=optimization_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    top_p=1,
+                    top_k=1,
+                    max_output_tokens=2048
+                )
             )
             
             if response.text:
@@ -143,9 +147,14 @@ class GeminiAIAnalyzer:
             Provide professional architectural insights and recommendations.
             """
             
-            response = self.client.models.generate_content(
-                model="gemini-2.5-pro",
-                contents=insights_prompt
+            response = self.model.generate_content(
+                contents=insights_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    top_p=1,
+                    top_k=1,
+                    max_output_tokens=2048
+                )
             )
             
             return response.text if response.text else "Analysis complete with AI insights."
