@@ -68,18 +68,32 @@ class DWGParser:
             layers = self._extract_layers(doc)
             print(f"Found {len(layers)} layers")
             
-            # Parse different entity types
+            # Parse different entity types with detailed logging
             lwpoly_zones = self._parse_lwpolylines(modelspace)
             poly_zones = self._parse_polylines(modelspace)
             hatch_zones = self._parse_hatches(modelspace)
             shape_zones = self._parse_closed_shapes(modelspace)
+            line_zones = self._parse_line_networks(modelspace)  # New: detect rooms from line networks
+            circle_zones = self._parse_circles_as_zones(modelspace)  # New: large circles as zones
             
             zones.extend(lwpoly_zones)
             zones.extend(poly_zones)
             zones.extend(hatch_zones)
             zones.extend(shape_zones)
+            zones.extend(line_zones)
+            zones.extend(circle_zones)
             
-            print(f"Parsed zones: LWPoly={len(lwpoly_zones)}, Poly={len(poly_zones)}, Hatch={len(hatch_zones)}, Shapes={len(shape_zones)}")
+            print(f"Entity analysis:")
+            print(f"  LWPolylines: {len(lwpoly_zones)} zones")
+            print(f"  Polylines: {len(poly_zones)} zones") 
+            print(f"  Hatches: {len(hatch_zones)} zones")
+            print(f"  Shapes: {len(shape_zones)} zones")
+            print(f"  Line networks: {len(line_zones)} zones")
+            print(f"  Circles: {len(circle_zones)} zones")
+            
+            # If no zones found, analyze entity types for debugging
+            if len(zones) == 0:
+                self._analyze_entity_types(modelspace)
             
             # Add layer information to zones
             for zone in zones:
@@ -100,7 +114,9 @@ class DWGParser:
             except:
                 pass
         
-        return self._validate_and_clean_zones(zones)
+        validated_zones = self._validate_and_clean_zones(zones)
+        print(f"Final validated zones: {len(validated_zones)}")
+        return validated_zones
     
     def parse_file_from_path(self, file_path: str) -> List[Dict[str, Any]]:
         """Parse DWG/DXF file from file path"""
@@ -377,3 +393,130 @@ class DWGParser:
                 valid_zones.append(zone)
         
         return valid_zones
+    
+    def _analyze_entity_types(self, modelspace):
+        """Analyze entity types in the DXF for debugging"""
+        entity_counts = {}
+        for entity in modelspace:
+            entity_type = entity.dxftype()
+            entity_counts[entity_type] = entity_counts.get(entity_type, 0) + 1
+        
+        print("Entity types found in DXF:")
+        for entity_type, count in sorted(entity_counts.items()):
+            print(f"  {entity_type}: {count}")
+    
+    def _parse_line_networks(self, modelspace) -> List[Dict]:
+        """Parse networks of connected lines to form closed boundaries"""
+        zones = []
+        lines = []
+        
+        # Collect all LINE entities
+        for entity in modelspace:
+            if entity.dxftype() == 'LINE':
+                start = (entity.dxf.start.x, entity.dxf.start.y)
+                end = (entity.dxf.end.x, entity.dxf.end.y)
+                lines.append({
+                    'start': start,
+                    'end': end,
+                    'layer': entity.dxf.layer,
+                    'used': False
+                })
+        
+        print(f"Found {len(lines)} LINE entities")
+        
+        # Try to form closed polygons from connected lines
+        tolerance = 0.1
+        
+        for i, start_line in enumerate(lines):
+            if start_line['used']:
+                continue
+                
+            polygon_points = [start_line['start'], start_line['end']]
+            current_end = start_line['end']
+            used_lines = [i]
+            
+            for _ in range(50):
+                found_connection = False
+                
+                for j, line in enumerate(lines):
+                    if j in used_lines or line['used']:
+                        continue
+                    
+                    if self._points_close(current_end, line['start'], tolerance):
+                        polygon_points.append(line['end'])
+                        current_end = line['end']
+                        used_lines.append(j)
+                        found_connection = True
+                        break
+                    elif self._points_close(current_end, line['end'], tolerance):
+                        polygon_points.append(line['start'])
+                        current_end = line['start']
+                        used_lines.append(j)
+                        found_connection = True
+                        break
+                
+                if not found_connection:
+                    break
+                
+                if self._points_close(current_end, start_line['start'], tolerance):
+                    if len(polygon_points) >= 3:
+                        try:
+                            from shapely.geometry import Polygon
+                            poly = Polygon(polygon_points[:-1])
+                            if poly.is_valid and poly.area > 1.0:
+                                zone = {
+                                    'points': list(poly.exterior.coords)[:-1],
+                                    'area': poly.area,
+                                    'perimeter': poly.length,
+                                    'layer': start_line['layer'],
+                                    'source': 'line_network'
+                                }
+                                zones.append(zone)
+                                
+                                for line_idx in used_lines:
+                                    lines[line_idx]['used'] = True
+                        except Exception as e:
+                            print(f"Error creating polygon from line network: {e}")
+                    break
+        
+        print(f"Created {len(zones)} zones from line networks")
+        return zones
+    
+    def _parse_circles_as_zones(self, modelspace) -> List[Dict]:
+        """Parse large circles as potential zones"""
+        zones = []
+        
+        for entity in modelspace:
+            if entity.dxftype() == 'CIRCLE':
+                radius = entity.dxf.radius
+                center = (entity.dxf.center.x, entity.dxf.center.y)
+                
+                if radius > 1.0:
+                    import math
+                    points = []
+                    num_points = max(8, int(radius * 2))
+                    for i in range(num_points):
+                        angle = 2 * math.pi * i / num_points
+                        x = center[0] + radius * math.cos(angle)
+                        y = center[1] + radius * math.sin(angle)
+                        points.append((x, y))
+                    
+                    area = math.pi * radius * radius
+                    perimeter = 2 * math.pi * radius
+                    
+                    zone = {
+                        'points': points,
+                        'area': area,
+                        'perimeter': perimeter,
+                        'layer': entity.dxf.layer,
+                        'source': 'circle'
+                    }
+                    zones.append(zone)
+        
+        return zones
+    
+    def _points_close(self, p1, p2, tolerance):
+        """Check if two points are within tolerance distance"""
+        dx = p1[0] - p2[0]
+        dy = p1[1] - p2[1]
+        return (dx*dx + dy*dy) <= tolerance*tolerance
