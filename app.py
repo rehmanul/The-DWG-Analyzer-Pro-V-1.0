@@ -55,7 +55,7 @@ except ImportError:
         def export_to_dxf(self, zones, results, path, **kwargs): pass
         def export_to_svg(self, zones, results, path): pass
     
-    class CollaborationManager: pass
+    from src.collaborative_features import CollaborationManager, TeamPlanningInterface
     class MultiFloorAnalyzer: pass
     class FloorPlan: pass
 
