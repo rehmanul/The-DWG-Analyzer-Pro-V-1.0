@@ -469,22 +469,34 @@ class DWGParser:
                             from shapely.geometry import Polygon
                             # Clean and validate points
                             cleaned_points = self._clean_polygon_points(polygon_points)
-                            
-                            if len(cleaned_points) >= 3:  # Minimum for valid polygon
-                                poly = Polygon(cleaned_points)
-                                if poly.is_valid and poly.area > 1.0:
-                                    zone = {
-                                        'points': list(poly.exterior.coords)[:-1],
-                                        'area': poly.area,
-                                        'perimeter': poly.length,
-                                        'layer': start_line['layer'],
-                                        'source': 'line_network'
-                                    }
-                                    zones.append(zone)
 
-                                    # Mark lines as used
-                                    for line_idx in used_lines:
-                                        lines[line_idx]['used'] = True
+                            if len(cleaned_points) >= 4:  # Need at least 4 points for linearring
+                                # Ensure polygon is closed
+                                if cleaned_points[0] != cleaned_points[-1]:
+                                    cleaned_points.append(cleaned_points[0])
+
+                                # Only create polygon if we have enough unique points
+                                unique_points = []
+                                for point in cleaned_points:
+                                    if not unique_points or (abs(point[0] - unique_points[-1][0]) > 1e-6 or 
+                                                           abs(point[1] - unique_points[-1][1]) > 1e-6):
+                                        unique_points.append(point)
+
+                                    if len(unique_points) >= 4:  # At least 3 unique + closing
+                                        poly = Polygon(unique_points)
+                                        if poly.is_valid and poly.area > 1.0:
+                                            zone = {
+                                                'points': list(poly.exterior.coords)[:-1],
+                                                'area': poly.area,
+                                                'perimeter': poly.length,
+                                                'layer': start_line['layer'],
+                                                'source': 'line_network'
+                                            }
+                                            zones.append(zone)
+
+                                            # Mark lines as used
+                                            for line_idx in used_lines:
+                                                lines[line_idx]['used'] = True
                         except Exception:
                             # Skip invalid polygons silently
                             pass
@@ -536,57 +548,57 @@ class DWGParser:
         """Check if points can form a valid polygon"""
         if len(points) < 4:  # Need at least 3 unique points + closing
             return False
-        
+
         # Remove duplicates and check unique points
         unique_points = []
         for point in points:
             if not unique_points or (abs(point[0] - unique_points[-1][0]) > 1e-6 or 
                                    abs(point[1] - unique_points[-1][1]) > 1e-6):
                 unique_points.append(point)
-        
+
         return len(unique_points) >= 3
 
     def _clean_polygon_points(self, points):
         """Clean polygon points by removing duplicates and ensuring proper closure"""
         if not points or len(points) < 3:
             return []
-        
+
         # Remove consecutive duplicate points
         cleaned = []
         for point in points:
             if not cleaned or (abs(point[0] - cleaned[-1][0]) > 1e-6 or 
                              abs(point[1] - cleaned[-1][1]) > 1e-6):
                 cleaned.append(point)
-        
+
         # Ensure we have enough points for a polygon
         if len(cleaned) < 3:
             return []
-        
+
         # Remove the last point if it's the same as the first (Shapely handles closure)
         if len(cleaned) > 3 and (abs(cleaned[0][0] - cleaned[-1][0]) < 1e-6 and 
                                 abs(cleaned[0][1] - cleaned[-1][1]) < 1e-6):
             cleaned = cleaned[:-1]
-        
+
         return cleaned
 
     def _sort_connected_lines(self, lines):
         """Sort lines to form a connected sequence"""
         if not lines:
             return []
-        
+
         sorted_lines = [lines[0]]
         remaining_lines = lines[1:]
         tolerance = 0.1
-        
+
         while remaining_lines:
             last_line = sorted_lines[-1]
             last_end = (last_line.dxf.end.x, last_line.dxf.end.y)
-            
+
             found_connection = False
             for i, line in enumerate(remaining_lines):
                 line_start = (line.dxf.start.x, line.dxf.start.y)
                 line_end = (line.dxf.end.x, line.dxf.end.y)
-                
+
                 if self._points_close(last_end, line_start, tolerance):
                     sorted_lines.append(line)
                     remaining_lines.pop(i)
@@ -599,10 +611,10 @@ class DWGParser:
                     remaining_lines.pop(i)
                     found_connection = True
                     break
-            
+
             if not found_connection:
                 break
-        
+
         return sorted_lines
 
     def _create_polygon_from_lines(self, lines):
