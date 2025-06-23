@@ -145,7 +145,7 @@ def get_advanced_components():
         'collaboration_manager': CollaborationManager(),
         'multi_floor_analyzer': MultiFloorAnalyzer(),
         'database': DatabaseManager(),
-        'ai_analyzer': GeminiAIAnalyzer()
+        'ai_analyzer': GeminiAIAnalyzer() if os.environ.get("GEMINI_API_KEY") else None
     }
 
 def setup_multi_floor_project():
