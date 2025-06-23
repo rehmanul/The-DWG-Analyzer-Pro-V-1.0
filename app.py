@@ -566,6 +566,37 @@ def display_advanced_analysis_dashboard(components):
     """Display advanced analysis dashboard"""
     if not st.session_state.analysis_results:
         st.info("Run advanced analysis to see comprehensive dashboard")
+        
+        # Show analysis buttons when no results exist
+        st.subheader("🚀 Start Analysis")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Core Analysis**")
+            if st.button("🤖 Advanced AI Analysis", type="primary", use_container_width=True, key="dashboard_advanced_analysis"):
+                run_advanced_analysis(components)
+            
+            if st.button("🏗️ Generate BIM Model", use_container_width=True, key="dashboard_bim_generate"):
+                if st.session_state.analysis_results:
+                    generate_bim_model(components)
+                else:
+                    st.warning("Please run analysis first")
+        
+        with col2:
+            st.write("**Specialized Analysis**") 
+            if st.button("🪑 Furniture Analysis", use_container_width=True, key="dashboard_furniture_analysis"):
+                if st.session_state.analysis_results:
+                    run_furniture_analysis(components)
+                else:
+                    st.warning("Please run analysis first")
+            
+            if st.button("📐 CAD Export Package", use_container_width=True, key="dashboard_cad_export"):
+                if st.session_state.analysis_results:
+                    generate_cad_export(components)
+                else:
+                    st.warning("Please run analysis first")
+        
         return
 
     results = st.session_state.analysis_results
