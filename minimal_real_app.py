@@ -5,15 +5,50 @@ import os
 import plotly.graph_objects as go
 from shapely.geometry import Polygon
 
+st.set_page_config(
+    page_title="Real DWG Analyzer",
+    page_icon="📐",
+    layout="wide"
+)
+
 st.title("Real DWG File Analyzer")
 st.write("This tool actually parses DWG files and shows real data - no mock results")
 
-uploaded_file = st.file_uploader("Upload DWG/DXF file", type=['dwg', 'dxf'])
+# Debug info
+st.sidebar.header("Debug Info")
+st.sidebar.write(f"Max upload size: 200MB")
+st.sidebar.write(f"Supported formats: DWG, DXF")
 
-if uploaded_file:
-    with tempfile.NamedTemporaryFile(suffix='.dwg', delete=False) as tmp:
-        tmp.write(uploaded_file.getvalue())
-        tmp_path = tmp.name
+# File uploader with better error handling
+uploaded_file = st.file_uploader(
+    "Upload DWG/DXF file", 
+    type=['dwg', 'dxf'],
+    help="Select a DWG or DXF file (max 200MB)",
+    key="dwg_uploader"
+)
+
+if uploaded_file and uploaded_file.size > 0:
+    st.sidebar.write(f"File: {uploaded_file.name}")
+    st.sidebar.write(f"Size: {uploaded_file.size / 1024:.1f} KB")
+    # Validate file
+    if uploaded_file.size > 200 * 1024 * 1024:  # 200MB limit
+        st.error("File too large. Please use a file under 200MB.")
+        st.stop()
+    
+    # Create temporary file with correct extension
+    file_ext = uploaded_file.name.lower().split('.')[-1]
+    
+    with tempfile.NamedTemporaryFile(suffix=f'.{file_ext}', delete=False) as tmp:
+        try:
+            file_bytes = uploaded_file.getvalue()
+            if len(file_bytes) == 0:
+                st.error("File appears to be empty")
+                st.stop()
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
+        except Exception as e:
+            st.error(f"Error reading file: {str(e)}")
+            st.stop()
     
     try:
         doc = ezdxf.readfile(tmp_path)

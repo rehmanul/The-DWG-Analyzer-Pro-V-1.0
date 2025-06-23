@@ -26,7 +26,7 @@ args = "streamlit_website"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Minimal Real App"
+args = "Working DWG App"
 
 [[workflows.workflow]]
 name = "Streamlit Server"
@@ -64,12 +64,12 @@ task = "shell.exec"
 args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false --server.fileWatcherType none --server.maxUploadSize 200"
 
 [[workflows.workflow]]
-name = "Minimal Real App"
+name = "Working DWG App"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run minimal_real_app.py --server.port 5000 --server.address 0.0.0.0"
+args = "streamlit run working_dwg_app.py --server.port 5000 --server.address 0.0.0.0"
 waitForPort = 5000
 
 [[ports]]
