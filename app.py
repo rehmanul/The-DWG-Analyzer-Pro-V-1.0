@@ -982,58 +982,36 @@ def main():
                 setup_collaboration_project()
 
         # Enhanced file upload with better error handling
-        st.subheader("📁 Upload DWG/DXF Files")
-        
-        try:
-            if st.session_state.advanced_mode:
-                uploaded_files = st.file_uploader(
-                    "Select multiple DWG/DXF files for batch analysis",
-                    type=['dwg', 'dxf'],
-                    accept_multiple_files=True,
-                    help="Upload multiple architectural plan files (Max 200MB per file)",
-                    key="advanced_file_uploader"
-                )
-            else:
-                uploaded_file = st.file_uploader(
-                    "Select a DWG/DXF file",
-                    type=['dwg', 'dxf'],
-                    accept_multiple_files=False,
-                    help="Upload architectural plan file (Max 200MB)",
-                    key="standard_file_uploader"
-                )
-                uploaded_files = [uploaded_file] if uploaded_file else []
+        uploaded_file = st.file_uploader(
+            "Choose DWG/DXF files",
+            type=['dwg', 'dxf'],
+            accept_multiple_files=st.session_state.advanced_mode,
+            help="Upload architectural plan files for analysis (Max 200MB per file)"
+        )
 
-            if uploaded_files and any(f is not None for f in uploaded_files):
-                valid_files = [f for f in uploaded_files if f is not None]
-                
-                if len(valid_files) == 1:
-                    file = valid_files[0]
-                    file_size_mb = file.size / (1024*1024)
-                    st.info(f"File: {file.name} ({file_size_mb:.1f} MB)")
-                    
-                    if st.button("Load & Analyze File", type="primary", key="load_single_file"):
+        if uploaded_file is not None:
+            try:
+                if isinstance(uploaded_file, list):
+                    # Multiple files
+                    st.write(f"Selected {len(uploaded_file)} files")
+                    total_size = sum(f.size for f in uploaded_file) / (1024*1024)
+                    st.write(f"Total size: {total_size:.1f} MB")
+
+                    if st.button("Load Multiple Files", type="primary"):
+                        load_multiple_dwg_files(uploaded_file)
+                else:
+                    # Single file
+                    file_size_mb = uploaded_file.size / (1024*1024)
+                    st.write(f"File: {uploaded_file.name}")
+                    st.write(f"Size: {file_size_mb:.1f} MB")
+
+                    if st.button("Load & Parse File", type="primary"):
                         if file_size_mb > 200:
                             st.error("File too large. Maximum size is 200MB.")
                         else:
-                            with st.spinner("Loading and parsing file..."):
-                                doc = load_dwg_file(file)
-                                if doc:
-                                    st.session_state.dwg_doc = doc
-                                    st.session_state.file_loaded = True
-                                    st.success("File loaded successfully!")
-                                    st.rerun()
-                                
-                elif len(valid_files) > 1:
-                    total_size = sum(f.size for f in valid_files) / (1024*1024)
-                    st.info(f"Selected {len(valid_files)} files (Total: {total_size:.1f} MB)")
-                    
-                    if st.button("Load Multiple Files", type="primary", key="load_multiple_files"):
-                        with st.spinner("Loading multiple files..."):
-                            load_multiple_dwg_files(valid_files)
-                            
-        except Exception as e:
-            st.error(f"Upload error: {str(e)}")
-            st.info("Try refreshing the page if the issue persists.")
+                            load_dwg_file(uploaded_file)
+            except Exception as e:
+                st.error(f"File handling error: {str(e)}")
 
         st.divider()
 
