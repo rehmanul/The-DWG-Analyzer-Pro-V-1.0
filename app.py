@@ -1056,12 +1056,15 @@ def main():
                 help="Select a sample file to analyze"
             )
             
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Load Architectural Plan", key="load_sample", type="primary"):
+            if st.button("Load Architectural Plan", key="load_sample", type="primary"):
                     sample_path = sample_files[selected_sample]
                     try:
-                        zones = load_dwg_file(sample_path)
+                        # Read file and parse with proper method signature
+                        with open(sample_path, 'rb') as f:
+                            file_bytes = f.read()
+                        
+                        parser = DWGParser()
+                        zones = parser.parse_file(file_bytes, Path(sample_path).name)
                         if zones:
                             st.session_state.zones = zones
                             st.session_state.file_loaded = True
@@ -1073,21 +1076,8 @@ def main():
                     except Exception as e:
                         st.error(f"Error loading file: {str(e)}")
             
-            with col2:
-                if st.button("Generate Demo Data", key="demo_btn"):
-                    st.session_state.zones = generate_demo_zones()
-                    st.session_state.file_loaded = True
-                    st.session_state.current_file = "Demo Layout"
-                    st.success("Demo data generated successfully!")
-                    st.rerun()
         else:
-            st.warning("No sample files available")
-            if st.button("Generate Demo Data", key="demo_only"):
-                st.session_state.zones = generate_demo_zones()
-                st.session_state.file_loaded = True
-                st.session_state.current_file = "Demo Layout"
-                st.success("Demo data generated!")
-                st.rerun()
+            st.warning("No architectural files available in the project")
 
         # Analysis parameters section
         st.divider()
