@@ -254,53 +254,279 @@ def setup_analysis_controls(components):
         if st.button("Generate Complete Report"):
             generate_comprehensive_report(components)
 
-def display_welcome_screen():
-    """Display welcome screen with feature overview"""
-    st.info("Please upload a DWG/DXF file to begin analysis")
-
-    col1, col2 = st.columns(2)
-
+def display_integrated_control_panel(components):
+    """Display integrated control panel in main area with better spacing"""
+    
+    # File upload section - prominently displayed
+    st.subheader("📂 Project Setup & File Input")
+    
+    # Project type selection for advanced mode
+    if st.session_state.advanced_mode:
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            project_type = st.selectbox("Project Type", [
+                "Single Floor Analysis", 
+                "Multi-Floor Building", 
+                "BIM Integration Project",
+                "Collaborative Team Project"
+            ], key="main_project_type")
+        with col2:
+            st.write("") # Spacer
+            
+        if project_type == "Multi-Floor Building":
+            setup_multi_floor_project()
+        elif project_type == "Collaborative Team Project":
+            setup_collaboration_project()
+    
+    st.divider()
+    
+    # File input section with better layout
+    col1, col2 = st.columns([3, 2])
+    
     with col1:
-        st.subheader("Standard Features")
-        st.markdown("""
-        - Room type detection and classification
-        - Optimal box/furniture placement calculation
-        - Interactive 2D/3D visualization
-        - Statistical analysis and reporting
-        - Basic export capabilities
-        """)
-
+        st.subheader("📁 Upload DXF File")
+        st.info("📋 **Important:** This application supports DXF format. Convert DWG files to DXF using AutoCAD, LibreCAD, FreeCAD, or online converters.")
+        
+        uploaded_file = st.file_uploader(
+            "Select your architectural drawing (DXF format)",
+            type=['dxf'],
+            help="Upload a DXF file to analyze. Convert DWG files to DXF format first.",
+            key="main_file_uploader"
+        )
+        
+        if uploaded_file is not None:
+            col_a, col_b = st.columns([2, 1])
+            with col_a:
+                file_size_mb = uploaded_file.size / (1024 * 1024)
+                st.write(f"📄 **{uploaded_file.name}** ({file_size_mb:.1f} MB)")
+            with col_b:
+                if st.button("Load File", type="primary", use_container_width=True):
+                    load_uploaded_file(uploaded_file)
+    
     with col2:
-        st.subheader("Advanced Features")
+        st.subheader("📋 Available Files")
+        
+        # Check for available DXF files
+        sample_files = {}
+        search_paths = [Path("attached_assets"), Path("."), Path("sample_files")]
+        
+        for search_path in search_paths:
+            if search_path.exists():
+                for file_path in search_path.glob("*.dxf"):
+                    if file_path.stat().st_size > 0:
+                        display_name = file_path.stem.replace("_", " ").replace("-", " ").title()
+                        sample_files[display_name] = str(file_path)
+        
+        if sample_files:
+            selected_sample = st.selectbox(
+                "Available DXF files:",
+                options=list(sample_files.keys()),
+                help="Select from DXF files found in the project",
+                key="main_sample_select"
+            )
+            
+            if st.button("Load Selected", type="secondary", use_container_width=True):
+                load_sample_file(sample_files[selected_sample], selected_sample)
+        else:
+            st.info("No DXF files found in project directories")
+    
+    # File format help
+    with st.expander("🔧 Need to convert DWG to DXF?"):
+        col_help1, col_help2 = st.columns(2)
+        with col_help1:
+            st.write("**Free Conversion Options:**")
+            st.write("• **LibreCAD** - Free, open-source CAD software")
+            st.write("• **FreeCAD** - Open-source 3D CAD software") 
+            st.write("• **Online converters** - Search 'DWG to DXF converter'")
+        with col_help2:
+            st.write("**Commercial Options:**")
+            st.write("• **AutoCAD** - File → Save As → DXF format")
+            st.write("• **BricsCAD** - Export → DXF format")
+            st.write("💡 **Tip:** Choose 'ASCII DXF' format for best compatibility")
+    
+    st.divider()
+    
+    # Analysis parameters - better organized
+    st.subheader("🔧 Analysis Configuration")
+    
+    # Create tabs for better organization
+    param_tabs = st.tabs(["Basic Parameters", "Advanced Settings", "Analysis Controls"])
+    
+    with param_tabs[0]:
+        # Basic parameters in a more spacious layout
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            box_length = st.number_input("Box Length (m)", min_value=0.1, max_value=10.0, value=2.0, step=0.1, key="main_box_length")
+            box_width = st.number_input("Box Width (m)", min_value=0.1, max_value=10.0, value=1.5, step=0.1, key="main_box_width")
+        
+        with col2:
+            margin = st.number_input("Margin (m)", min_value=0.0, max_value=5.0, value=0.5, step=0.1, key="main_margin")
+            confidence_threshold = st.slider("Confidence Threshold", min_value=0.5, max_value=0.95, value=0.7, step=0.05, key="main_confidence")
+        
+        with col3:
+            enable_rotation = st.checkbox("Allow Box Rotation", value=True, key="main_rotation")
+            smart_spacing = st.checkbox("Smart Spacing Optimization", value=True, key="main_spacing")
+    
+    with param_tabs[1]:
+        if st.session_state.advanced_mode:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**AI Model Configuration**")
+                ai_model = st.selectbox("AI Classification Model", [
+                    "Advanced Ensemble (Recommended)",
+                    "Random Forest", 
+                    "Gradient Boosting",
+                    "Neural Network"
+                ], key="main_ai_model")
+                
+                analysis_depth = st.selectbox("Analysis Depth", [
+                    "Comprehensive (All Features)",
+                    "Standard (Core Features)", 
+                    "Quick (Basic Analysis)"
+                ], key="main_analysis_depth")
+            
+            with col2:
+                st.write("**Integration Options**")
+                enable_bim = st.checkbox("Enable BIM Integration", value=True, key="main_enable_bim")
+                if enable_bim:
+                    bim_standard = st.selectbox("BIM Standard", ["IFC 4.3", "COBie 2.4", "Custom"], key="main_bim_standard")
+                
+                enable_furniture = st.checkbox("Enable Furniture Catalog", value=True, key="main_enable_furniture")
+                if enable_furniture:
+                    sustainability_pref = st.selectbox("Sustainability Preference", 
+                                                     ["A+ (Highest)", "A", "B", "C", "Any"], key="main_sustainability")
+        else:
+            st.info("Switch to Advanced Mode to access additional configuration options")
+    
+    with param_tabs[2]:
+        # Analysis controls with better spacing
+        st.write("**Ready to analyze? Choose your analysis type:**")
+        
+        if st.session_state.advanced_mode:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Core Analysis**")
+                if st.button("🤖 Advanced AI Analysis", type="primary", use_container_width=True, key="main_advanced_analysis"):
+                    params = compile_parameters()
+                    run_advanced_analysis(components)
+                
+                if st.button("🏗️ Generate BIM Model", use_container_width=True, key="main_bim_generate"):
+                    generate_bim_model(components)
+            
+            with col2:
+                st.write("**Specialized Analysis**") 
+                if st.button("🪑 Furniture Analysis", use_container_width=True, key="main_furniture_analysis"):
+                    run_furniture_analysis(components)
+                
+                if st.button("📐 CAD Export Package", use_container_width=True, key="main_cad_export"):
+                    generate_cad_export(components)
+        else:
+            # Standard mode - single analysis button
+            params = {
+                'box_length': box_length,
+                'box_width': box_width, 
+                'margin': margin,
+                'confidence_threshold': confidence_threshold,
+                'enable_rotation': enable_rotation,
+                'smart_spacing': smart_spacing
+            }
+            
+            if st.button("🤖 Run AI Analysis", type="primary", use_container_width=True, key="main_standard_analysis"):
+                run_ai_analysis(params['box_length'], params['box_width'], params['margin'], 
+                               params['confidence_threshold'], params['enable_rotation'], params['smart_spacing'])
+    
+    # Feature overview section
+    st.divider()
+    st.subheader("🌟 Feature Overview")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Standard Features**")
         st.markdown("""
-        - **Advanced AI Models**: Ensemble learning with 95%+ accuracy
-        - **BIM Integration**: Full IFC/COBie compliance
-        - **Multi-Floor Analysis**: Complete building analysis
-        - **Team Collaboration**: Real-time collaborative planning
-        - **Furniture Catalog**: Integration with pricing and procurement
-        - **Advanced Optimization**: Genetic algorithms and simulated annealing
-        - **CAD Export**: Professional drawing packages
-        - **Database Integration**: Project management and history
+        ✅ Room type detection and classification  
+        ✅ Optimal box/furniture placement calculation  
+        ✅ Interactive 2D/3D visualization  
+        ✅ Statistical analysis and reporting  
+        ✅ Basic export capabilities  
+        """)
+    
+    with col2:
+        st.write("**Advanced Features**")
+        st.markdown("""
+        🚀 **Advanced AI Models**: Ensemble learning with 95%+ accuracy  
+        🏗️ **BIM Integration**: Full IFC/COBie compliance  
+        🏢 **Multi-Floor Analysis**: Complete building analysis  
+        👥 **Team Collaboration**: Real-time collaborative planning  
+        🪑 **Furniture Catalog**: Integration with pricing and procurement  
+        ⚡ **Advanced Optimization**: Genetic algorithms and simulated annealing  
+        📐 **CAD Export**: Professional drawing packages  
+        💾 **Database Integration**: Project management and history  
         """)
 
-    with st.expander("Getting Started Guide"):
-        st.markdown("""
-        ### Quick Start (Standard Mode)
-        1. Upload your DWG/DXF file
-        2. Configure box dimensions and parameters
-        3. Run AI analysis
-        4. Review results and export reports
+def load_uploaded_file(uploaded_file):
+    """Load uploaded file with error handling"""
+    try:
+        file_bytes = uploaded_file.getvalue()
+        file_size_mb = len(file_bytes) / (1024 * 1024)
+        
+        with st.spinner(f"Processing {uploaded_file.name} ({file_size_mb:.1f} MB)..."):
+            parser = DWGParser()
+            zones = parser.parse_file(file_bytes, uploaded_file.name)
+        
+        if zones and len(zones) > 0:
+            st.session_state.zones = zones
+            st.session_state.file_loaded = True
+            st.session_state.current_file = uploaded_file.name
+            st.success(f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'")
+            st.rerun()
+        else:
+            st.warning("No zones found in the uploaded file. The file may not contain recognizable room boundaries or closed polygons.")
+            st.info("This could happen if the file contains only lines, points, or text without closed room boundaries.")
+            
+    except Exception as e:
+        error_msg = str(e)
+        st.error(f"Failed to process file: {error_msg}")
+        
+        if "corrupted" in error_msg.lower():
+            st.info("The file appears to be corrupted. Try exporting it again from your CAD software.")
+        elif "cannot read" in error_msg.lower():
+            st.info("Make sure the file is a valid DWG or DXF format and not password protected.")
+        else:
+            st.info("Try using a different file or contact support if the issue persists.")
 
-        ### Professional Workflow (Advanced Mode)
-        1. **Project Setup**: Choose project type (single floor, multi-floor, BIM, collaborative)
-        2. **File Upload**: Upload single or multiple architectural files
-        3. **Advanced Configuration**: Select AI models, BIM standards, sustainability preferences
-        4. **Comprehensive Analysis**: Run advanced AI analysis with multiple algorithms
-        5. **BIM Integration**: Generate IFC-compliant building models
-        6. **Furniture Integration**: Access professional furniture catalogs with pricing
-        7. **Team Collaboration**: Enable real-time collaborative editing
-        8. **Export Package**: Generate complete CAD drawing packages
-        """)
+def load_sample_file(sample_path, selected_sample):
+    """Load sample file with error handling"""
+    try:
+        with open(sample_path, 'rb') as f:
+            file_bytes = f.read()
+        
+        parser = DWGParser()
+        zones = parser.parse_file(file_bytes, Path(sample_path).name)
+        if zones:
+            st.session_state.zones = zones
+            st.session_state.file_loaded = True
+            st.session_state.current_file = selected_sample
+            st.success(f"Successfully loaded {len(zones)} zones from '{selected_sample}'")
+            st.rerun()
+        else:
+            st.error("Could not parse the selected file")
+    except Exception as e:
+        st.error(f"Error loading file: {str(e)}")
+
+def compile_parameters():
+    """Compile parameters from the main interface"""
+    return {
+        'box_length': st.session_state.get('main_box_length', 2.0),
+        'box_width': st.session_state.get('main_box_width', 1.5),
+        'margin': st.session_state.get('main_margin', 0.5),
+        'confidence_threshold': st.session_state.get('main_confidence', 0.7),
+        'enable_rotation': st.session_state.get('main_rotation', True),
+        'smart_spacing': st.session_state.get('main_spacing', True)
+    }
 
 def display_main_interface(components):
     """Display main interface with analysis results"""
@@ -997,182 +1223,42 @@ def main():
     with col2:
         st.session_state.advanced_mode = st.toggle("Advanced Mode", value=st.session_state.advanced_mode, key="main_advanced_mode_toggle")
 
-    # Sidebar for controls
+    # Simplified sidebar with just mode toggle
     with st.sidebar:
-        st.header("📋 Control Panel")
-
+        st.header("🎛️ Quick Settings")
+        
         # Mode indicator
-        mode_label = "🚀 Professional Mode" if st.session_state.advanced_mode else "🔧 Standard Mode"
+        mode_label = "🚀 Professional Mode" if st.session_state.advanced_mode else "🔧 Standard Mode"  
         st.info(mode_label)
-
-        # File upload section
-        st.subheader("📂 Project Setup")
-
-        if st.session_state.advanced_mode:
-            project_type = st.selectbox("Project Type", [
-                "Single Floor Analysis", 
-                "Multi-Floor Building", 
-                "BIM Integration Project",
-                "Collaborative Team Project"
-            ])
-
-            if project_type == "Multi-Floor Building":
-                setup_multi_floor_project()
-            elif project_type == "Collaborative Team Project":
-                setup_collaboration_project()
-
-        # File input section
-        st.subheader("📁 File Input")
         
-        # Check multiple possible locations for DXF files
-        sample_files = {}
-        search_paths = [Path("attached_assets"), Path("."), Path("sample_files")]
+        if st.session_state.zones:
+            st.success(f"✅ File Loaded: {len(st.session_state.zones)} zones")
+            if hasattr(st.session_state, 'current_file'):
+                st.write(f"📄 {st.session_state.current_file}")
         
-        for search_path in search_paths:
-            if search_path.exists():
-                # Only look for DXF files since DWG is not supported
-                for file_path in search_path.glob("*.dxf"):
-                    if file_path.stat().st_size > 0:
-                        display_name = file_path.stem.replace("_", " ").replace("-", " ").title()
-                        sample_files[display_name] = str(file_path)
-                        
-                # Show DWG files but mark them as requiring conversion
-                dwg_files = list(search_path.glob("*.dwg"))
-                if dwg_files:
-                    st.warning(f"Found {len(dwg_files)} DWG file(s) that need conversion to DXF format:")
-                    for dwg_file in dwg_files:
-                        st.write(f"• {dwg_file.name} - Requires conversion to DXF")
-        
-        # Upload option
-        st.write("**Option 1: Upload DXF File**")
-        st.info("📋 **Important:** This application currently supports DXF format only. If you have a DWG file, please convert it to DXF using AutoCAD, LibreCAD, FreeCAD, or any CAD software.")
-        uploaded_file = st.file_uploader(
-            "Upload your architectural drawing (DXF format)",
-            type=['dxf'],
-            help="Select a DXF file to analyze. Convert DWG files to DXF format first."
-        )
-        
-        if uploaded_file is not None:
-            if st.button("Load Uploaded File", type="primary"):
-                try:
-                    file_bytes = uploaded_file.getvalue()
-                    file_size_mb = len(file_bytes) / (1024 * 1024)
-                    
-                    with st.spinner(f"Processing {uploaded_file.name} ({file_size_mb:.1f} MB)..."):
-                        parser = DWGParser()
-                        zones = parser.parse_file(file_bytes, uploaded_file.name)
-                    
-                    if zones and len(zones) > 0:
-                        st.session_state.zones = zones
-                        st.session_state.file_loaded = True
-                        st.session_state.current_file = uploaded_file.name
-                        st.success(f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'")
-                        st.rerun()
-                    else:
-                        st.warning("No zones found in the uploaded file. The file may not contain recognizable room boundaries or closed polygons.")
-                        st.info("This could happen if the file contains only lines, points, or text without closed room boundaries.")
-                        
-                except Exception as e:
-                    error_msg = str(e)
-                    st.error(f"Failed to process file: {error_msg}")
-                    
-                    if "corrupted" in error_msg.lower():
-                        st.info("The file appears to be corrupted. Try exporting it again from your CAD software.")
-                    elif "cannot read" in error_msg.lower():
-                        st.info("Make sure the file is a valid DWG or DXF format and not password protected.")
-                    else:
-                        st.info("Try using a different file or contact support if the issue persists.")
-        
-        # Available files option
-        if sample_files:
-            st.write("**Option 2: Use Available DXF Files**")
-            selected_sample = st.selectbox(
-                "Available DXF files:",
-                options=list(sample_files.keys()),
-                help="Select from DXF files found in the project"
-            )
-            
-            if st.button("Load Selected File", key="load_sample"):
-                sample_path = sample_files[selected_sample]
-                try:
-                    with open(sample_path, 'rb') as f:
-                        file_bytes = f.read()
-                    
-                    parser = DWGParser()
-                    zones = parser.parse_file(file_bytes, Path(sample_path).name)
-                    if zones:
-                        st.session_state.zones = zones
-                        st.session_state.file_loaded = True
-                        st.session_state.current_file = selected_sample
-                        st.success(f"Successfully loaded {len(zones)} zones from '{selected_sample}'")
-                        st.rerun()
-                    else:
-                        st.error("Could not parse the selected file")
-                except Exception as e:
-                    st.error(f"Error loading file: {str(e)}")
-        
-        # Instructions for adding files
-        if not sample_files and uploaded_file is None:
-            st.info("**How to add DXF files:**")
-            st.write("1. **Convert DWG to DXF:** Use AutoCAD, LibreCAD, FreeCAD, or online converters")
-            st.write("2. **Upload:** Use the file uploader above")
-            st.write("3. **Local files:** Place .dxf files in the project root directory")
-            
-            with st.expander("🔧 DWG to DXF Conversion Guide"):
-                st.write("**Free Options:**")
-                st.write("• **LibreCAD** - Free, open-source CAD software")
-                st.write("• **FreeCAD** - Open-source 3D CAD software")
-                st.write("• **Online converters** - Search for 'DWG to DXF converter'")
-                st.write("")
-                st.write("**Commercial Options:**")
-                st.write("• **AutoCAD** - File → Save As → DXF format")
-                st.write("• **BricsCAD** - Export → DXF format")
-                st.write("")
-                st.write("💡 **Tip:** When exporting, choose 'ASCII DXF' format for best compatibility.")
-
-        # Analysis parameters section
-        st.divider()
-
-        st.divider()
-
-        # Analysis parameters
-        params = setup_analysis_parameters(components)
-
-        st.divider()
-
-        # Analysis controls in main area
-        st.subheader("Analysis Controls")
-
-        if st.session_state.advanced_mode:
-            col1, col2 = st.columns(2)
-
-            with col1:
-                if st.button("Advanced AI Analysis", type="primary"):
-                    run_advanced_analysis(components)
-
-                if st.button("Generate BIM Model"):
-                    generate_bim_model(components)
-
-            with col2:
-                if st.button("Furniture Analysis"):
-                    run_furniture_analysis(components)
-
-                if st.button("CAD Export Package"):
-                    generate_cad_export(components)
-        else:
-            if st.button("Run AI Analysis", type="primary"):
-                run_ai_analysis(params['box_length'], params['box_width'], params['margin'], 
-                               params['confidence_threshold'], params['enable_rotation'], params['smart_spacing'])
-
         if st.session_state.analysis_results:
-            st.divider()
-            if st.button("Generate Complete Report"):
+            st.success(f"🤖 Analysis Complete: {st.session_state.analysis_results.get('total_boxes', 0)} placements")
+            
+        # Quick actions
+        st.divider()
+        st.subheader("🚀 Quick Actions")
+        
+        if st.session_state.analysis_results:
+            if st.button("📊 Generate Report", type="primary", use_container_width=True):
                 generate_comprehensive_report(components)
+                
+            if st.session_state.advanced_mode:
+                if st.button("🏗️ Generate BIM", use_container_width=True):
+                    generate_bim_model(components)
+                if st.button("🪑 Furniture Analysis", use_container_width=True):
+                    run_furniture_analysis(components)
+                if st.button("📐 CAD Export", use_container_width=True):
+                    generate_cad_export(components)
 
-    # Main content area
+    # Main content area with integrated control panel
     try:
-        if not st.session_state.dwg_loaded:
-            display_welcome_screen()
+        if not st.session_state.zones:
+            display_integrated_control_panel(components)
         else:
             display_main_interface(components)
     except Exception as e:
