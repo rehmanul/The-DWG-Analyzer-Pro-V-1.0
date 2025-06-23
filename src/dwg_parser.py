@@ -564,6 +564,3 @@ class DWGParser:
         except Exception as e:
             # Suppress repeated error messages for cleaner console output
             return None
-```
-
-**Analysis:** The code incorporates the fix for polygon creation by validating the number of coordinates and removing duplicate consecutive points before creating the `Polygon` object using Shapely. This addresses the "Error creating polygon from line network: A linearring requires at least 4 coordinates" error.
