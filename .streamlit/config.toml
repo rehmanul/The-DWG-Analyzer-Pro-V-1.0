@@ -2,8 +2,11 @@
 headless = true
 address = "0.0.0.0"
 port = 5000
-enableCORS = false
+enableCORS = true
+enableXsrfProtection = false
 enableWebsocketCompression = false
+maxUploadSize = 200
+maxMessageSize = 200
 
 [theme]
 primaryColor = "#1f77b4"
