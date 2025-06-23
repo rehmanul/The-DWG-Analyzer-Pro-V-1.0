@@ -9,7 +9,7 @@ deploymentTarget = "autoscale"
 run = ["sh", "-c", "streamlit run app.py --server.port 8501 --server.address 0.0.0.0"]
 
 [workflows]
-runButton = "Project"
+runButton = "Streamlit Server Fixed"
 
 [[workflows.workflow]]
 name = "Project"
@@ -40,6 +40,24 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "uv add ezdxf shapely matplotlib plotly pandas numpy reportlab rectpack opencv-python scikit-learn scipy"
+
+[[workflows.workflow]]
+name = "Streamlit App"
+author = 42824376
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0"
+
+[[workflows.workflow]]
+name = "Streamlit Server Fixed"
+author = 42824376
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false --server.fileWatcherType none"
 
 [[ports]]
 localPort = 5000

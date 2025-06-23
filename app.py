@@ -1,19 +1,17 @@
 import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
-import numpy as np
+from datetime import datetime
 import json
 import io
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.patches import Polygon as MplPolygon
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
 import asyncio
 import tempfile
 import os
-from datetime import datetime
 
 # Import custom modules
 from src.dwg_parser import DWGParser
@@ -539,7 +537,7 @@ def generate_comprehensive_report(components):
     if not st.session_state.analysis_results:
         st.warning("No analysis results available for report generation")
         return
-        
+
     try:
         with st.spinner("Generating comprehensive report..."):
             export_manager = ExportManager()
@@ -1316,18 +1314,22 @@ def display_statistics():
         placement_counts = {zone: len(placements) for zone, placements in results.get('placements', {}).items()}
 
         if placement_counts:
-            fig_bar = go.Figure(data=[
-                go.Bar(x=list(placement_counts.keys()), y=list(placement_counts.values()))
-            ])
-            fig_bar.update_layout(
-                title="Boxes per Zone",
-                xaxis_title="Zone",
-                yaxis_title="Number of Boxes"
+            # Create DataFrame for Plotly
+            df = pd.DataFrame({
+                'Zone': list(placement_counts.keys()),
+                'Count': list(placement_counts.values())
+            })
+
+            fig_bar = px.bar(
+                df,
+                x='Zone',
+                y='Count',
+                title="Boxes per Zone"
             )
         else:
-            fig_bar = go.Figure()
+            fig_bar = px.Figure()
             fig_bar.update_layout(title="No placement data available")
-        fig_bar.update_xaxis(tickangle=45)
+        fig_bar.update_xaxes(tickangle=45)
         st.plotly_chart(fig_bar, use_container_width=True)
 
     # Efficiency metrics
