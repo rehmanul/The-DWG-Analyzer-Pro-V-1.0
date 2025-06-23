@@ -597,7 +597,10 @@ class DWGParser:
 
         # Remove the last point if it's the same as the first (Shapely handles closure)
         if len(cleaned) > 3 and (abs(cleaned[0][0] - cleaned[-1][0]) < 1e-6 and 
+                                abs(cleaned[0][1] - cleaned[-1][1]) < 1e-6):
+            cleaned = cleaned[:-1]
 
+        return cleaned
 
     def _parse_text_based_zones(self, modelspace) -> List[Dict]:
         """Parse zones based on text labels and surrounding geometry"""
