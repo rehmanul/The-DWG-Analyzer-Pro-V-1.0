@@ -1029,55 +1029,80 @@ def main():
             elif project_type == "Collaborative Team Project":
                 setup_collaboration_project()
 
-        # File input section - prioritize sample files to avoid upload issues
+        # File input section
         st.subheader("📁 File Input")
         
-        # Direct access to sample files
-        st.info("Select from available architectural drawings:")
-        
+        # Check multiple possible locations for DWG files
         sample_files = {}
-        attached_assets = Path("attached_assets")
+        search_paths = [Path("attached_assets"), Path("."), Path("sample_files")]
         
-        if attached_assets.exists():
-            for file_path in attached_assets.glob("*.dwg"):
-                if file_path.stat().st_size > 0:
-                    display_name = file_path.stem.replace("_", " ").replace("-", " ").title()
-                    sample_files[display_name] = str(file_path)
-            
-            for file_path in attached_assets.glob("*.dxf"):
-                if file_path.stat().st_size > 0:
-                    display_name = file_path.stem.replace("_", " ").replace("-", " ").title()
-                    sample_files[display_name] = str(file_path)
+        for search_path in search_paths:
+            if search_path.exists():
+                for pattern in ["*.dwg", "*.dxf"]:
+                    for file_path in search_path.glob(pattern):
+                        if file_path.stat().st_size > 0:
+                            display_name = file_path.stem.replace("_", " ").replace("-", " ").title()
+                            sample_files[display_name] = str(file_path)
         
+        # Upload option
+        st.write("**Option 1: Upload DWG/DXF File**")
+        uploaded_file = st.file_uploader(
+            "Upload your architectural drawing",
+            type=['dwg', 'dxf'],
+            help="Select a DWG or DXF file to analyze"
+        )
+        
+        if uploaded_file is not None:
+            if st.button("Load Uploaded File", type="primary"):
+                try:
+                    file_bytes = uploaded_file.getvalue()
+                    parser = DWGParser()
+                    zones = parser.parse_file(file_bytes, uploaded_file.name)
+                    if zones:
+                        st.session_state.zones = zones
+                        st.session_state.file_loaded = True
+                        st.session_state.current_file = uploaded_file.name
+                        st.success(f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'")
+                        st.rerun()
+                    else:
+                        st.error("Could not parse the uploaded file")
+                except Exception as e:
+                    st.error(f"Error processing file: {str(e)}")
+        
+        # Available files option
         if sample_files:
+            st.write("**Option 2: Use Available Files**")
             selected_sample = st.selectbox(
                 "Available architectural files:",
                 options=list(sample_files.keys()),
-                help="Select a sample file to analyze"
+                help="Select from files found in the project"
             )
             
-            if st.button("Load Architectural Plan", key="load_sample", type="primary"):
-                    sample_path = sample_files[selected_sample]
-                    try:
-                        # Read file and parse with proper method signature
-                        with open(sample_path, 'rb') as f:
-                            file_bytes = f.read()
-                        
-                        parser = DWGParser()
-                        zones = parser.parse_file(file_bytes, Path(sample_path).name)
-                        if zones:
-                            st.session_state.zones = zones
-                            st.session_state.file_loaded = True
-                            st.session_state.current_file = selected_sample
-                            st.success(f"Successfully loaded {len(zones)} zones from '{selected_sample}'")
-                            st.rerun()
-                        else:
-                            st.error("Could not parse the selected file")
-                    except Exception as e:
-                        st.error(f"Error loading file: {str(e)}")
-            
-        else:
-            st.warning("No architectural files available in the project")
+            if st.button("Load Selected File", key="load_sample"):
+                sample_path = sample_files[selected_sample]
+                try:
+                    with open(sample_path, 'rb') as f:
+                        file_bytes = f.read()
+                    
+                    parser = DWGParser()
+                    zones = parser.parse_file(file_bytes, Path(sample_path).name)
+                    if zones:
+                        st.session_state.zones = zones
+                        st.session_state.file_loaded = True
+                        st.session_state.current_file = selected_sample
+                        st.success(f"Successfully loaded {len(zones)} zones from '{selected_sample}'")
+                        st.rerun()
+                    else:
+                        st.error("Could not parse the selected file")
+                except Exception as e:
+                    st.error(f"Error loading file: {str(e)}")
+        
+        # Instructions for adding files
+        if not sample_files and uploaded_file is None:
+            st.info("**How to add DWG/DXF files:**")
+            st.write("1. Use the file uploader above, or")
+            st.write("2. Place your .dwg or .dxf files in the project root directory")
+            st.write("3. Refresh the page to see them in the file list")
 
         # Analysis parameters section
         st.divider()
