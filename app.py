@@ -450,7 +450,7 @@ def display_furniture_catalog(components):
     with col2:
         st.metric("Total Cost", f"${total_cost:,.0f}")
     with col3:
-        st.metric("Sustainability Score", f"{avg_sustainability:.2f}")2f}")
+        st.metric("Sustainability Score", f"{avg_sustainability:.2f}")
 
 def display_cad_export_interface(components):
     """Display CAD export interface"""
