@@ -1,7 +1,6 @@
 import os
 import json
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 import numpy as np
 from typing import Dict, List, Any
 
@@ -117,6 +116,7 @@ class GeminiAIAnalyzer(MultiAIAnalyzer):
         else:
             self.model = None
 
+
     def analyze_room_type(self, zone_data: Dict) -> Dict:
         """Analyze room type using Gemini AI"""
         if not self.available:
@@ -137,9 +137,17 @@ class GeminiAIAnalyzer(MultiAIAnalyzer):
 
             Based on these architectural measurements, classify this room type and provide confidence score.
             """
-
             response = self.model.generate_content(zone_description)
 
+
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    top_p=1,
+                    top_k=1,
+                    max_output_tokens=2048
+                )
+            )
+            }
             if response.text:
                 try:
                     result = json.loads(response.text)
@@ -213,7 +221,9 @@ class GeminiAIAnalyzer(MultiAIAnalyzer):
             Provide optimization strategy and efficiency score.
             """
 
+
             response = self.model.generate_content(optimization_prompt)
+
 
             if response.text:
                 return {
@@ -245,6 +255,7 @@ class GeminiAIAnalyzer(MultiAIAnalyzer):
             """
 
             response = self.model.generate_content(insights_prompt)
+
 
             return response.text if response.text else "Analysis complete with AI insights."
 

@@ -4,6 +4,7 @@ import os
 from typing import List, Dict, Any
 from pathlib import Path
 
+
 class DWGParser:
     """
     Parser for DWG and DXF files using ezdxf library
@@ -11,11 +12,12 @@ class DWGParser:
 
     def __init__(self):
         self.supported_entities = [
-            'LWPOLYLINE', 'POLYLINE', 'LINE', 'ARC', 'CIRCLE', 
-            'ELLIPSE', 'SPLINE', 'HATCH'
+            'LWPOLYLINE', 'POLYLINE', 'LINE', 'ARC', 'CIRCLE', 'ELLIPSE',
+            'SPLINE', 'HATCH'
         ]
 
-    def parse_file(self, file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
+    def parse_file(self, file_bytes: bytes,
+                   filename: str) -> List[Dict[str, Any]]:
         """
         Parse DWG/DXF file and extract zones (closed polygons)
 
@@ -30,8 +32,10 @@ class DWGParser:
         temp_file_path = None
 
         try:
+
             # Create temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as temp_file:
+            with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=Path(filename).suffix) as temp_file:
                 temp_file.write(file_bytes)
                 temp_file_path = temp_file.name
 
@@ -40,7 +44,9 @@ class DWGParser:
 
             if file_ext == '.dwg':
                 # Native DWG files are not supported by ezdxf
-                raise Exception(f"Native DWG files are not currently supported. Please convert '{filename}' to DXF format using AutoCAD, LibreCAD, or FreeCAD and try again. Most CAD software can export to DXF format.")
+                raise Exception(
+                    f"Native DWG files are not currently supported. Please convert '{filename}' to DXF format using AutoCAD, LibreCAD, or FreeCAD and try again. Most CAD software can export to DXF format."
+                )
 
             # Try to read the DXF file
             try:
@@ -53,11 +59,15 @@ class DWGParser:
                     print(f"Recovery successful for {filename}")
                 except Exception as recovery_error:
                     print(f"Recovery failed: {recovery_error}")
-                    raise Exception(f"File appears to be corrupted and cannot be recovered: {str(recovery_error)}")
+                    raise Exception(
+                        f"File appears to be corrupted and cannot be recovered: {str(recovery_error)}"
+                    )
             except Exception as e:
                 print(f"General error reading file: {e}")
                 if "not a DXF file" in str(e):
-                    raise Exception(f"File '{filename}' is not in DXF format. Please save/export your drawing as DXF format and try again.")
+                    raise Exception(
+                        f"File '{filename}' is not in DXF format. Please save/export your drawing as DXF format and try again."
+                    )
                 else:
                     raise Exception(f"Cannot read file {filename}: {str(e)}")
 
@@ -73,8 +83,10 @@ class DWGParser:
             poly_zones = self._parse_polylines(modelspace)
             hatch_zones = self._parse_hatches(modelspace)
             shape_zones = self._parse_closed_shapes(modelspace)
-            line_zones = self._parse_line_networks(modelspace)  # New: detect rooms from line networks
-            circle_zones = self._parse_circles_as_zones(modelspace)  # New: large circles as zones
+            line_zones = self._parse_line_networks(
+                modelspace)  # New: detect rooms from line networks
+            circle_zones = self._parse_circles_as_zones(
+                modelspace)  # New: large circles as zones
 
             zones.extend(lwpoly_zones)
             zones.extend(poly_zones)
@@ -85,7 +97,7 @@ class DWGParser:
 
             print(f"Entity analysis:")
             print(f"  LWPolylines: {len(lwpoly_zones)} zones")
-            print(f"  Polylines: {len(poly_zones)} zones") 
+            print(f"  Polylines: {len(poly_zones)} zones")
             print(f"  Hatches: {len(hatch_zones)} zones")
             print(f"  Shapes: {len(shape_zones)} zones")
             print(f"  Line networks: {len(line_zones)} zones")
@@ -172,11 +184,17 @@ class DWGParser:
                     'name': layer.dxf.name,
                     'color': getattr(layer.dxf, 'color', 7),
                     'linetype': getattr(layer.dxf, 'linetype', 'CONTINUOUS'),
-                    'visible': not getattr(layer.dxf, 'flags', 0) & 1  # Check if frozen
+                    'visible':
+                    not getattr(layer.dxf, 'flags', 0) & 1  # Check if frozen
                 }
         except:
             # Fallback if layer extraction fails
-            layers['0'] = {'name': '0', 'color': 7, 'linetype': 'CONTINUOUS', 'visible': True}
+            layers['0'] = {
+                'name': '0',
+                'color': 7,
+                'linetype': 'CONTINUOUS',
+                'visible': True
+            }
 
         return layers
 
@@ -190,11 +208,16 @@ class DWGParser:
                     points = [(point[0], point[1]) for point in entity]
                     if len(points) >= 3:  # Minimum for a polygon
                         zones.append({
-                            'points': points,
-                            'layer': entity.dxf.layer,
-                            'entity_type': 'LWPOLYLINE',
-                            'closed': True,
-                            'area': self._calculate_polygon_area(points)
+                            'points':
+                            points,
+                            'layer':
+                            entity.dxf.layer,
+                            'entity_type':
+                            'LWPOLYLINE',
+                            'closed':
+                            True,
+                            'area':
+                            self._calculate_polygon_area(points)
                         })
                 except Exception as e:
                     continue  # Skip problematic entities
@@ -208,15 +231,20 @@ class DWGParser:
         for entity in modelspace.query('POLYLINE'):
             if entity.is_closed:
                 try:
-                    points = [(vertex.dxf.location[0], vertex.dxf.location[1]) 
-                             for vertex in entity.vertices]
+                    points = [(vertex.dxf.location[0], vertex.dxf.location[1])
+                              for vertex in entity.vertices]
                     if len(points) >= 3:
                         zones.append({
-                            'points': points,
-                            'layer': entity.dxf.layer,
-                            'entity_type': 'POLYLINE',
-                            'closed': True,
-                            'area': self._calculate_polygon_area(points)
+                            'points':
+                            points,
+                            'layer':
+                            entity.dxf.layer,
+                            'entity_type':
+                            'POLYLINE',
+                            'closed':
+                            True,
+                            'area':
+                            self._calculate_polygon_area(points)
                         })
                 except Exception as e:
                     continue
@@ -243,11 +271,16 @@ class DWGParser:
 
                         if len(points) >= 3:
                             zones.append({
-                                'points': points,
-                                'layer': entity.dxf.layer,
-                                'entity_type': 'HATCH',
-                                'closed': True,
-                                'area': self._calculate_polygon_area(points)
+                                'points':
+                                points,
+                                'layer':
+                                entity.dxf.layer,
+                                'entity_type':
+                                'HATCH',
+                                'closed':
+                                True,
+                                'area':
+                                self._calculate_polygon_area(points)
                             })
             except Exception as e:
                 continue
@@ -310,7 +343,11 @@ class DWGParser:
 
         return abs(area) / 2.0
 
-    def _circle_to_polygon(self, cx: float, cy: float, radius: float, num_points: int = 32) -> List[tuple]:
+    def _circle_to_polygon(self,
+                           cx: float,
+                           cy: float,
+                           radius: float,
+                           num_points: int = 32) -> List[tuple]:
         """Convert circle to polygon approximation"""
         import math
         points = []
@@ -321,7 +358,11 @@ class DWGParser:
             points.append((x, y))
         return points
 
-    def _ellipse_to_polygon(self, center, major_axis, ratio: float, num_points: int = 32) -> List[tuple]:
+    def _ellipse_to_polygon(self,
+                            center,
+                            major_axis,
+                            ratio: float,
+                            num_points: int = 32) -> List[tuple]:
         """Convert ellipse to polygon approximation"""
         import math
         points = []
@@ -339,8 +380,10 @@ class DWGParser:
             local_y = minor_length * math.sin(t)
 
             # Rotate and translate
-            x = cx + local_x * math.cos(angle_offset) - local_y * math.sin(angle_offset)
-            y = cy + local_x * math.sin(angle_offset) + local_y * math.cos(angle_offset)
+            x = cx + local_x * math.cos(angle_offset) - local_y * math.sin(
+                angle_offset)
+            y = cy + local_x * math.sin(angle_offset) + local_y * math.cos(
+                angle_offset)
             points.append((x, y))
 
         return points
@@ -369,7 +412,8 @@ class DWGParser:
 
         return points
 
-    def _validate_and_clean_zones(self, zones: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _validate_and_clean_zones(
+            self, zones: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Validate and clean extracted zones"""
         valid_zones = []
 
@@ -383,8 +427,9 @@ class DWGParser:
             prev_point = None
 
             for point in zone['points']:
-                if prev_point is None or (abs(point[0] - prev_point[0]) > 1e-6 or 
-                                        abs(point[1] - prev_point[1]) > 1e-6):
+                if prev_point is None or (abs(point[0] - prev_point[0]) > 1e-6
+                                          or abs(point[1] - prev_point[1])
+                                          > 1e-6):
                     cleaned_points.append(point)
                     prev_point = point
 
@@ -423,7 +468,8 @@ class DWGParser:
                 start = (entity.dxf.start.x, entity.dxf.start.y)
                 end = (entity.dxf.end.x, entity.dxf.end.y)
                 # Skip very short lines (less than 0.1 units)
-                line_length = ((end[0] - start[0])**2 + (end[1] - start[1])**2)**0.5
+                line_length = ((end[0] - start[0])**2 +
+                               (end[1] - start[1])**2)**0.5
                 if line_length > 0.1:
                     lines.append({
                         'start': start,
@@ -453,13 +499,15 @@ class DWGParser:
                     if j in used_lines or line['used']:
                         continue
 
-                    if self._points_close(current_end, line['start'], tolerance):
+                    if self._points_close(current_end, line['start'],
+                                          tolerance):
                         polygon_points.append(line['end'])
                         current_end = line['end']
                         used_lines.append(j)
                         found_connection = True
                         break
-                    elif self._points_close(current_end, line['end'], tolerance):
+                    elif self._points_close(current_end, line['end'],
+                                            tolerance):
                         polygon_points.append(line['start'])
                         current_end = line['start']
                         used_lines.append(j)
@@ -470,15 +518,19 @@ class DWGParser:
                     break
 
                 # Check if we've closed the loop
-                if self._points_close(current_end, start_line['start'], tolerance):
+                if self._points_close(current_end, start_line['start'],
+                                      tolerance):
                     # Validate polygon before creating
                     if self._is_valid_polygon_points(polygon_points):
                         try:
                             from shapely.geometry import Polygon
                             # Clean and validate points
-                            cleaned_points = self._clean_polygon_points(polygon_points)
+                            cleaned_points = self._clean_polygon_points(
+                                polygon_points)
 
-                            if len(cleaned_points) >= 4:  # Need at least 4 points for linearring
+                            if len(
+                                    cleaned_points
+                            ) >= 4:  # Need at least 4 points for linearring
                                 # Ensure polygon is closed
                                 if cleaned_points[0] != cleaned_points[-1]:
                                     cleaned_points.append(cleaned_points[0])
@@ -486,16 +538,22 @@ class DWGParser:
                                 # Only create polygon if we have enough unique points
                                 unique_points = []
                                 for point in cleaned_points:
-                                    if not unique_points or (abs(point[0] - unique_points[-1][0]) > 1e-6 or 
-                                                           abs(point[1] - unique_points[-1][1]) > 1e-6):
+                                    if not unique_points or (
+                                            abs(point[0] -
+                                                unique_points[-1][0]) > 1e-6 or
+                                            abs(point[1] -
+                                                unique_points[-1][1]) > 1e-6):
                                         unique_points.append(point)
 
                                 # Need at least 3 unique points for a valid polygon
                                 if len(unique_points) >= 3:
                                     try:
                                         # Ensure polygon is properly closed for Shapely
-                                        if unique_points[0] != unique_points[-1]:
-                                            polygon_coords = unique_points + [unique_points[0]]
+                                        if unique_points[0] != unique_points[
+                                                -1]:
+                                            polygon_coords = unique_points + [
+                                                unique_points[0]
+                                            ]
                                         else:
                                             polygon_coords = unique_points
 
@@ -504,17 +562,20 @@ class DWGParser:
                                             poly = Polygon(polygon_coords)
                                             if poly.is_valid and poly.area > 1.0:
                                                 zone = {
-                                                    'points': unique_points,  # Store without closing point
+                                                    'points':
+                                                    unique_points,  # Store without closing point
                                                     'area': poly.area,
                                                     'perimeter': poly.length,
-                                                    'layer': start_line['layer'],
+                                                    'layer':
+                                                    start_line['layer'],
                                                     'source': 'line_network'
                                                 }
                                                 zones.append(zone)
 
                                                 # Mark lines as used
                                                 for line_idx in used_lines:
-                                                    lines[line_idx]['used'] = True
+                                                    lines[line_idx][
+                                                        'used'] = True
                                     except Exception:
                                         # Skip invalid polygons silently
                                         pass
@@ -563,7 +624,7 @@ class DWGParser:
         """Check if two points are within tolerance distance"""
         dx = p1[0] - p2[0]
         dy = p1[1] - p2[1]
-        return (dx*dx + dy*dy) <= tolerance*tolerance
+        return (dx * dx + dy * dy) <= tolerance * tolerance
 
     def _is_valid_polygon_points(self, points):
         """Check if points can form a valid polygon"""
@@ -573,8 +634,9 @@ class DWGParser:
         # Remove duplicates and check unique points
         unique_points = []
         for point in points:
-            if not unique_points or (abs(point[0] - unique_points[-1][0]) > 1e-6 or 
-                                   abs(point[1] - unique_points[-1][1]) > 1e-6):
+            if not unique_points or (
+                    abs(point[0] - unique_points[-1][0]) > 1e-6
+                    or abs(point[1] - unique_points[-1][1]) > 1e-6):
                 unique_points.append(point)
 
         return len(unique_points) >= 3
@@ -587,8 +649,8 @@ class DWGParser:
         # Remove consecutive duplicate points
         cleaned = []
         for point in points:
-            if not cleaned or (abs(point[0] - cleaned[-1][0]) > 1e-6 or 
-                             abs(point[1] - cleaned[-1][1]) > 1e-6):
+            if not cleaned or (abs(point[0] - cleaned[-1][0]) > 1e-6
+                               or abs(point[1] - cleaned[-1][1]) > 1e-6):
                 cleaned.append(point)
 
         # Ensure we have enough points for a polygon
@@ -596,8 +658,8 @@ class DWGParser:
             return []
 
         # Remove the last point if it's the same as the first (Shapely handles closure)
-        if len(cleaned) > 3 and (abs(cleaned[0][0] - cleaned[-1][0]) < 1e-6 and 
-                                abs(cleaned[0][1] - cleaned[-1][1]) < 1e-6):
+        if len(cleaned) > 3 and (abs(cleaned[0][0] - cleaned[-1][0]) < 1e-6 and
+                                 abs(cleaned[0][1] - cleaned[-1][1]) < 1e-6):
             cleaned = cleaned[:-1]
 
         return cleaned
@@ -611,12 +673,17 @@ class DWGParser:
         for entity in modelspace.query('TEXT'):
             text_content = entity.dxf.text.strip().upper()
             # Look for common room keywords
-            room_keywords = ['ROOM', 'OFFICE', 'BEDROOM', 'KITCHEN', 'BATHROOM', 'LIVING', 'HALL', 'STORAGE']
+            room_keywords = [
+                'ROOM', 'OFFICE', 'BEDROOM', 'KITCHEN', 'BATHROOM', 'LIVING',
+                'HALL', 'STORAGE'
+            ]
             if any(keyword in text_content for keyword in room_keywords):
                 room_texts.append({
-                    'text': text_content,
+                    'text':
+                    text_content,
                     'position': (entity.dxf.insert.x, entity.dxf.insert.y),
-                    'layer': entity.dxf.layer
+                    'layer':
+                    entity.dxf.layer
                 })
 
         # For each text, try to find surrounding lines that form a room
@@ -631,7 +698,8 @@ class DWGParser:
 
                 # Check if line is near the text
                 for point in [start, end]:
-                    dist = ((point[0] - text_pos[0])**2 + (point[1] - text_pos[1])**2)**0.5
+                    dist = ((point[0] - text_pos[0])**2 +
+                            (point[1] - text_pos[1])**2)**0.5
                     if dist <= search_radius:
                         nearby_lines.append(entity)
                         break
@@ -639,7 +707,8 @@ class DWGParser:
             # Try to form a polygon from nearby lines
             if len(nearby_lines) >= 3:
                 try:
-                    polygon = self._create_polygon_from_text_lines(nearby_lines, text_pos)
+                    polygon = self._create_polygon_from_text_lines(
+                        nearby_lines, text_pos)
                     if polygon and polygon.area > 5.0:
                         zone = {
                             'points': list(polygon.exterior.coords)[:-1],
@@ -670,9 +739,11 @@ class DWGParser:
 
                 # Find other inserts that could form a rectangle
                 corner_candidates = []
-                for j, other_insert in enumerate(inserts[i+1:], i+1):
-                    other_pos = (other_insert.dxf.insert.x, other_insert.dxf.insert.y)
-                    dist = ((pos[0] - other_pos[0])**2 + (pos[1] - other_pos[1])**2)**0.5
+                for j, other_insert in enumerate(inserts[i + 1:], i + 1):
+                    other_pos = (other_insert.dxf.insert.x,
+                                 other_insert.dxf.insert.y)
+                    dist = ((pos[0] - other_pos[0])**2 +
+                            (pos[1] - other_pos[1])**2)**0.5
 
                     # Look for inserts within reasonable distance
                     if 2.0 <= dist <= 50.0:
@@ -691,10 +762,8 @@ class DWGParser:
                         min_y, max_y = min(ys), max(ys)
 
                         if (max_x - min_x) > 2.0 and (max_y - min_y) > 2.0:
-                            rect_points = [
-                                (min_x, min_y), (max_x, min_y),
-                                (max_x, max_y), (min_x, max_y)
-                            ]
+                            rect_points = [(min_x, min_y), (max_x, min_y),
+                                           (max_x, max_y), (min_x, max_y)]
 
                             area = (max_x - min_x) * (max_y - min_y)
                             perimeter = 2 * ((max_x - min_x) + (max_y - min_y))
@@ -721,8 +790,9 @@ class DWGParser:
             for line in lines:
                 start = (line.dxf.start.x, line.dxf.start.y)
                 end = (line.dxf.end.x, line.dxf.end.y)
-                mid_point = ((start[0] + end[0])/2, (start[1] + end[1])/2)
-                dist = ((mid_point[0] - center_point[0])**2 + (mid_point[1] - center_point[1])**2)**0.5
+                mid_point = ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2)
+                dist = ((mid_point[0] - center_point[0])**2 +
+                        (mid_point[1] - center_point[1])**2)**0.5
                 line_data.append((dist, start, end))
 
             # Sort by distance and take closest lines
@@ -740,7 +810,9 @@ class DWGParser:
                 for point in points:
                     is_duplicate = False
                     for existing in unique_points:
-                        if abs(point[0] - existing[0]) < 0.5 and abs(point[1] - existing[1]) < 0.5:
+                        if abs(point[0] -
+                               existing[0]) < 0.5 and abs(point[1] -
+                                                          existing[1]) < 0.5:
                             is_duplicate = True
                             break
                     if not is_duplicate:
@@ -823,13 +895,16 @@ class DWGParser:
                     unique_points.append(point)
 
             # Ensure the polygon is closed
-            if len(unique_points) > 2 and unique_points[0]!= unique_points[-1]:
+            if len(unique_points
+                   ) > 2 and unique_points[0] != unique_points[-1]:
                 unique_points.append(unique_points[0])
 
             # Validate minimum requirements for a polygon
-            if len(unique_points) >= 4:  # At least 3 unique points + closing point
+            if len(unique_points
+                   ) >= 4:  # At least 3 unique points + closing point
                 # Additional validation: check if points form a valid polygon
-                unique_coords = list(set(unique_points[:-1]))  # Remove duplicates and closing point
+                unique_coords = list(set(
+                    unique_points[:-1]))  # Remove duplicates and closing point
                 if len(unique_coords) >= 3:
                     return Polygon(unique_points)
                 else:
@@ -840,7 +915,10 @@ class DWGParser:
         except Exception as e:
             # Suppress repeated error messages for cleaner console output
             return None
+
+
 #Fix indentation error and complete the incomplete line
+
     def _clean_polygon_points(self, points):
         """Clean polygon points by removing duplicates and ensuring proper closure"""
         if not points or len(points) < 3:
@@ -849,8 +927,8 @@ class DWGParser:
         # Remove consecutive duplicate points
         cleaned = []
         for point in points:
-            if not cleaned or (abs(point[0] - cleaned[-1][0]) > 1e-6 or 
-                             abs(point[1] - cleaned[-1][1]) > 1e-6):
+            if not cleaned or (abs(point[0] - cleaned[-1][0]) > 1e-6
+                               or abs(point[1] - cleaned[-1][1]) > 1e-6):
                 cleaned.append(point)
 
         # Ensure we have enough points for a polygon
@@ -858,8 +936,8 @@ class DWGParser:
             return []
 
         # Remove the last point if it's the same as the first (Shapely handles closure)
-        if len(cleaned) > 3 and (abs(cleaned[0][0] - cleaned[-1][0]) < 1e-6 and 
-                                abs(cleaned[0][1] - cleaned[-1][1]) < 1e-6):
+        if len(cleaned) > 3 and (abs(cleaned[0][0] - cleaned[-1][0]) < 1e-6 and
+                                 abs(cleaned[0][1] - cleaned[-1][1]) < 1e-6):
             cleaned = cleaned[:-1]
 
         return cleaned
