@@ -459,24 +459,33 @@ class DWGParser:
                     break
 
                 if self._points_close(current_end, start_line['start'], tolerance):
-                    if len(polygon_points) >= 3:
+                    if len(polygon_points) >= 4:  # Need at least 4 points for a valid polygon
                         try:
                             from shapely.geometry import Polygon
-                            poly = Polygon(polygon_points[:-1])
-                            if poly.is_valid and poly.area > 1.0:
-                                zone = {
-                                    'points': list(poly.exterior.coords)[:-1],
-                                    'area': poly.area,
-                                    'perimeter': poly.length,
-                                    'layer': start_line['layer'],
-                                    'source': 'line_network'
-                                }
-                                zones.append(zone)
+                            # Remove duplicate points and ensure we have enough unique points
+                            unique_points = []
+                            for point in polygon_points[:-1]:  # Remove last point to avoid duplication
+                                if not unique_points or (abs(point[0] - unique_points[-1][0]) > 1e-6 or 
+                                                       abs(point[1] - unique_points[-1][1]) > 1e-6):
+                                    unique_points.append(point)
+                            
+                            if len(unique_points) >= 3:  # Shapely needs at least 3 unique points
+                                poly = Polygon(unique_points)
+                                if poly.is_valid and poly.area > 1.0:
+                                    zone = {
+                                        'points': list(poly.exterior.coords)[:-1],
+                                        'area': poly.area,
+                                        'perimeter': poly.length,
+                                        'layer': start_line['layer'],
+                                        'source': 'line_network'
+                                    }
+                                    zones.append(zone)
 
-                                for line_idx in used_lines:
-                                    lines[line_idx]['used'] = True
+                                    for line_idx in used_lines:
+                                        lines[line_idx]['used'] = True
                         except Exception as e:
-                            print(f"Error creating polygon from line network: {e}")
+                            # Silently skip problematic polygons to avoid spam
+                            pass
                     break
 
         print(f"Created {len(zones)} zones from line networks")
@@ -520,6 +529,42 @@ class DWGParser:
         dx = p1[0] - p2[0]
         dy = p1[1] - p2[1]
         return (dx*dx + dy*dy) <= tolerance*tolerance
+
+    def _sort_connected_lines(self, lines):
+        """Sort lines to form a connected sequence"""
+        if not lines:
+            return []
+        
+        sorted_lines = [lines[0]]
+        remaining_lines = lines[1:]
+        tolerance = 0.1
+        
+        while remaining_lines:
+            last_line = sorted_lines[-1]
+            last_end = (last_line.dxf.end.x, last_line.dxf.end.y)
+            
+            found_connection = False
+            for i, line in enumerate(remaining_lines):
+                line_start = (line.dxf.start.x, line.dxf.start.y)
+                line_end = (line.dxf.end.x, line.dxf.end.y)
+                
+                if self._points_close(last_end, line_start, tolerance):
+                    sorted_lines.append(line)
+                    remaining_lines.pop(i)
+                    found_connection = True
+                    break
+                elif self._points_close(last_end, line_end, tolerance):
+                    # Reverse the line direction
+                    line.dxf.start, line.dxf.end = line.dxf.end, line.dxf.start
+                    sorted_lines.append(line)
+                    remaining_lines.pop(i)
+                    found_connection = True
+                    break
+            
+            if not found_connection:
+                break
+        
+        return sorted_lines
 
     def _create_polygon_from_lines(self, lines):
         """Create a polygon from connected lines"""
