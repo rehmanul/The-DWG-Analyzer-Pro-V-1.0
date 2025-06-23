@@ -1174,7 +1174,8 @@ def display_advanced_statistics(components):
             st.subheader("Room Type Distribution")
             if room_types:
                 room_df = pd.DataFrame(list(room_types.items()), columns=['Room Type', 'Count'])
-                fig = px.pie(room_df, values='Count', names='Room Type', title="Room Distribution")
+                fig = go.Figure(data=[go.Pie(labels=room_df['Room Type'], values=room_df['Count'])])
+                fig.update_layout(title="Room Distribution")
                 st.plotly_chart(fig, use_container_width=True)
 
         with col2:
@@ -1445,11 +1446,11 @@ def display_statistics():
         room_types = [info.get('type', 'Unknown') for info in results.get('rooms', {}).values()]
         room_type_counts = pd.Series(room_types).value_counts()
 
-        fig_pie = px.pie(
+        fig_pie = go.Figure(data=[go.Pie(
             values=room_type_counts.values,
-            names=room_type_counts.index,
-            title="Room Type Distribution"
-        )
+            labels=room_type_counts.index
+        )])
+        fig_pie.update_layout(title="Room Type Distribution")
         st.plotly_chart(fig_pie, use_container_width=True)
 
     with col2:
@@ -1463,14 +1464,16 @@ def display_statistics():
                 'Count': list(placement_counts.values())
             })
 
-            fig_bar = px.bar(
-                df,
-                x='Zone',
-                y='Count',
-                title="Boxes per Zone"
+            fig_bar = go.Figure(data=[
+                go.Bar(x=df['Zone'], y=df['Count'])
+            ])
+            fig_bar.update_layout(
+                title="Boxes per Zone",
+                xaxis_title="Zone",
+                yaxis_title="Count"
             )
         else:
-            fig_bar = px.Figure()
+            fig_bar = go.Figure()
             fig_bar.update_layout(title="No placement data available")
         fig_bar.update_xaxes(tickangle=45)
         st.plotly_chart(fig_bar, use_container_width=True)
