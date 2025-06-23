@@ -5,8 +5,9 @@ port = 5000
 enableCORS = true
 enableXsrfProtection = false
 enableWebsocketCompression = false
-maxUploadSize = 200
-maxMessageSize = 200
+maxUploadSize = 50
+maxMessageSize = 50
+fileWatcherType = "none"
 
 [theme]
 primaryColor = "#1f77b4"

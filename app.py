@@ -974,13 +974,39 @@ def main():
             elif project_type == "Collaborative Team Project":
                 setup_collaboration_project()
 
-        # Enhanced file upload with better error handling
-        uploaded_file = st.file_uploader(
-            "Choose DWG/DXF files",
-            type=['dwg', 'dxf'],
-            accept_multiple_files=st.session_state.advanced_mode,
-            help="Upload architectural plan files for analysis (Max 200MB per file)"
+        # File upload section with bypass for upload issues
+        st.subheader("📁 File Input")
+        
+        upload_method = st.radio(
+            "Choose input method:",
+            ["Upload File", "Use Sample Files"],
+            horizontal=True
         )
+        
+        uploaded_file = None
+        
+        if upload_method == "Upload File":
+            try:
+                uploaded_file = st.file_uploader(
+                    "Choose DWG/DXF files",
+                    type=['dwg', 'dxf'],
+                    accept_multiple_files=st.session_state.advanced_mode,
+                    help="Upload architectural plan files for analysis (Max 50MB per file)",
+                    key="file_uploader_main"
+                )
+                
+                if uploaded_file is not None:
+                    if hasattr(uploaded_file, 'size') and uploaded_file.size > 50 * 1024 * 1024:
+                        st.error("File too large. Please use a file smaller than 50MB.")
+                        uploaded_file = None
+                        
+            except Exception as e:
+                st.error(f"Upload error: {str(e)}. Try using sample files instead.")
+                uploaded_file = None
+        
+        else:
+            # Sample files from attached_assets
+            st.info("Using available sample DWG files from the project")
 
         if uploaded_file is not None:
             try:
@@ -1096,68 +1122,91 @@ def display_advanced_statistics(components):
                                         'thickness': 0.75, 'value': 90}}))
                 st.plotly_chart(fig, use_container_width=True)
 
-def load_dwg_file(uploaded_file):
-    """Load and parse DWG/DXF file"""
+def load_dwg_file(file_input):
+    """Load and parse DWG/DXF file from file upload or path"""
     try:
         with st.spinner("Loading and parsing DWG file..."):
-            # Validate file
-            if uploaded_file is None:
-                st.error("No file selected.")
-                return
-
-            # Check file extension
-            file_ext = uploaded_file.name.lower().split('.')[-1]
-            if file_ext not in ['dwg', 'dxf']:
-                st.error(f"Unsupported file format: {file_ext}. Please upload a DWG or DXF file.")
-                return
-
-            # Check file size (limit to 50MB for better performance)
-            file_size = uploaded_file.size
-            if file_size > 50 * 1024 * 1024:
-                st.error("File too large. Please use a file smaller than 50MB.")
-                return
-
-            if file_size == 0:
-                st.error("File appears to be empty.")
-                return
-
-            # Read file content
-            try:
-                file_bytes = uploaded_file.getvalue()
-            except Exception:
-                file_bytes = uploaded_file.read()
-
-            if len(file_bytes) == 0:
-                st.error("Unable to read file content.")
-                return
-
-            # Create temporary file for processing
-            with tempfile.NamedTemporaryFile(suffix=f'.{file_ext}', delete=False) as tmp_file:
-                tmp_file.write(file_bytes)
-                tmp_file_path = tmp_file.name
-
-            try:
-                # Parse the DWG/DXF file
+            # Handle both uploaded file objects and file paths
+            if isinstance(file_input, str):
+                # File path
+                file_path = Path(file_input)
+                if not file_path.exists():
+                    st.error(f"File not found: {file_input}")
+                    return None
+                
+                file_ext = file_path.suffix.lower().replace('.', '')
+                if file_ext not in ['dwg', 'dxf']:
+                    st.error(f"Unsupported file format: {file_ext}")
+                    return None
+                
+                # Parse file directly from path
                 parser = DWGParser()
-                zones = parser.parse_file_from_path(tmp_file_path)
+                zones = parser.parse_file(str(file_path))
+                
+                if zones:
+                    st.success(f"Successfully parsed {len(zones)} zones from {file_path.name}")
+                    return zones
+                else:
+                    st.warning("No zones found in file")
+                    return None
+                    
+            else:
+                # Uploaded file object
+                if file_input is None:
+                    st.error("No file selected.")
+                    return None
 
-                if not zones:
-                    st.warning("No valid zones found in the file. Please check if the file contains closed polygons or room boundaries.")
-                    return
+                # Check file extension
+                file_ext = file_input.name.lower().split('.')[-1]
+                if file_ext not in ['dwg', 'dxf']:
+                    st.error(f"Unsupported file format: {file_ext}. Please upload a DWG or DXF file.")
+                    return None
 
-                st.session_state.zones = zones
-                st.session_state.dwg_loaded = True
-                st.session_state.current_filename = uploaded_file.name
+                # Check file size
+                file_size = file_input.size
+                if file_size > 50 * 1024 * 1024:
+                    st.error("File too large. Please use a file smaller than 50MB.")
+                    return None
 
-                st.success(f"Successfully loaded {len(zones)} zones from {uploaded_file.name}")
-                st.rerun()
+                if file_size == 0:
+                    st.error("File appears to be empty.")
+                    return None
 
-            finally:
-                # Clean up temporary file
+                # Read file content
                 try:
-                    os.unlink(tmp_file_path)
-                except:
-                    pass
+                    file_bytes = file_input.getvalue()
+                except Exception:
+                    file_bytes = file_input.read()
+
+                if len(file_bytes) == 0:
+                    st.error("Unable to read file content.")
+                    return None
+
+                # Create temporary file for processing
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix=f'.{file_ext}', delete=False) as tmp_file:
+                    tmp_file.write(file_bytes)
+                    tmp_file_path = tmp_file.name
+
+                try:
+                    # Parse the DWG/DXF file
+                    parser = DWGParser()
+                    zones = parser.parse_file(tmp_file_path)
+
+                    if zones:
+                        st.success(f"Successfully parsed {len(zones)} zones from {file_input.name}")
+                        return zones
+                    else:
+                        st.warning("No zones found in uploaded file")
+                        return None
+                        
+                except Exception as e:
+                    st.error(f"Error parsing DWG/DXF file: {str(e)}")
+                    return None
+                finally:
+                    # Clean up temporary file
+                    if Path(tmp_file_path).exists():
+                        Path(tmp_file_path).unlink()
 
     except Exception as e:
         error_msg = str(e)
