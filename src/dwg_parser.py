@@ -97,7 +97,7 @@ class DWGParser:
                 # Try parsing TEXT entities as room labels and surrounding geometry
                 text_zones = self._parse_text_based_zones(modelspace)
                 zones.extend(text_zones)
-                
+
                 # Try parsing BLOCK references as rooms
                 block_zones = self._parse_block_zones(modelspace)
                 zones.extend(block_zones)
@@ -498,7 +498,7 @@ class DWGParser:
                                             polygon_coords = unique_points + [unique_points[0]]
                                         else:
                                             polygon_coords = unique_points
-                                        
+
                                         # Only create if we have at least 4 coordinates (3 unique + closing)
                                         if len(polygon_coords) >= 4:
                                             poly = Polygon(polygon_coords)
@@ -605,7 +605,7 @@ class DWGParser:
     def _parse_text_based_zones(self, modelspace) -> List[Dict]:
         """Parse zones based on text labels and surrounding geometry"""
         zones = []
-        
+
         # Find text entities that might be room labels
         room_texts = []
         for entity in modelspace.query('TEXT'):
@@ -618,24 +618,24 @@ class DWGParser:
                     'position': (entity.dxf.insert.x, entity.dxf.insert.y),
                     'layer': entity.dxf.layer
                 })
-        
+
         # For each text, try to find surrounding lines that form a room
         for text_info in room_texts:
             nearby_lines = []
             text_pos = text_info['position']
             search_radius = 50.0  # Search within 50 units
-            
+
             for entity in modelspace.query('LINE'):
                 start = (entity.dxf.start.x, entity.dxf.start.y)
                 end = (entity.dxf.end.x, entity.dxf.end.y)
-                
+
                 # Check if line is near the text
                 for point in [start, end]:
                     dist = ((point[0] - text_pos[0])**2 + (point[1] - text_pos[1])**2)**0.5
                     if dist <= search_radius:
                         nearby_lines.append(entity)
                         break
-            
+
             # Try to form a polygon from nearby lines
             if len(nearby_lines) >= 3:
                 try:
@@ -652,32 +652,32 @@ class DWGParser:
                         zones.append(zone)
                 except Exception:
                     continue
-        
+
         return zones
-    
+
     def _parse_block_zones(self, modelspace) -> List[Dict]:
         """Parse zones from block references (furniture, fixtures)"""
         zones = []
-        
+
         # Look for INSERT entities (block references)
         inserts = list(modelspace.query('INSERT'))
-        
+
         # Group inserts that might form room boundaries
         if len(inserts) >= 4:  # Need at least 4 for a room
             # Try to find rectangular patterns
             for i, insert in enumerate(inserts):
                 pos = (insert.dxf.insert.x, insert.dxf.insert.y)
-                
+
                 # Find other inserts that could form a rectangle
                 corner_candidates = []
                 for j, other_insert in enumerate(inserts[i+1:], i+1):
                     other_pos = (other_insert.dxf.insert.x, other_insert.dxf.insert.y)
                     dist = ((pos[0] - other_pos[0])**2 + (pos[1] - other_pos[1])**2)**0.5
-                    
+
                     # Look for inserts within reasonable distance
                     if 2.0 <= dist <= 50.0:
                         corner_candidates.append(other_pos)
-                
+
                 # If we have enough corners, try to form a rectangle
                 if len(corner_candidates) >= 3:
                     try:
@@ -685,20 +685,20 @@ class DWGParser:
                         # Simple rectangular zone approximation
                         xs = [p[0] for p in all_points]
                         ys = [p[1] for p in all_points]
-                        
+
                         # Create bounding rectangle
                         min_x, max_x = min(xs), max(xs)
                         min_y, max_y = min(ys), max(ys)
-                        
+
                         if (max_x - min_x) > 2.0 and (max_y - min_y) > 2.0:
                             rect_points = [
                                 (min_x, min_y), (max_x, min_y),
                                 (max_x, max_y), (min_x, max_y)
                             ]
-                            
+
                             area = (max_x - min_x) * (max_y - min_y)
                             perimeter = 2 * ((max_x - min_x) + (max_y - min_y))
-                            
+
                             zone = {
                                 'points': rect_points,
                                 'area': area,
@@ -710,9 +710,9 @@ class DWGParser:
                             break  # Only create one zone per starting point
                     except Exception:
                         continue
-        
+
         return zones
-    
+
     def _create_polygon_from_text_lines(self, lines, center_point):
         """Create polygon from lines near a text label"""
         try:
@@ -724,16 +724,16 @@ class DWGParser:
                 mid_point = ((start[0] + end[0])/2, (start[1] + end[1])/2)
                 dist = ((mid_point[0] - center_point[0])**2 + (mid_point[1] - center_point[1])**2)**0.5
                 line_data.append((dist, start, end))
-            
+
             # Sort by distance and take closest lines
             line_data.sort(key=lambda x: x[0])
             closest_lines = line_data[:8]  # Use up to 8 closest lines
-            
+
             # Extract all endpoints
             points = []
             for _, start, end in closest_lines:
                 points.extend([start, end])
-            
+
             if len(points) >= 6:  # Need at least 3 unique points
                 # Remove duplicates
                 unique_points = []
@@ -745,26 +745,21 @@ class DWGParser:
                             break
                     if not is_duplicate:
                         unique_points.append(point)
-                
+
                 if len(unique_points) >= 3:
                     from shapely.geometry import Polygon
                     # Create convex hull
                     from scipy.spatial import ConvexHull
                     import numpy as np
-                    
+
                     hull = ConvexHull(np.array(unique_points))
                     hull_points = [unique_points[i] for i in hull.vertices]
-                    
+
                     return Polygon(hull_points)
         except Exception:
             pass
-        
+
         return None
-
-                                abs(cleaned[0][1] - cleaned[-1][1]) < 1e-6):
-            cleaned = cleaned[:-1]
-
-        return cleaned
 
     def _sort_connected_lines(self, lines):
         """Sort lines to form a connected sequence"""
@@ -828,7 +823,7 @@ class DWGParser:
                     unique_points.append(point)
 
             # Ensure the polygon is closed
-            if len(unique_points) > 2 and unique_points[0] != unique_points[-1]:
+            if len(unique_points) > 2 and unique_points[0]!= unique_points[-1]:
                 unique_points.append(unique_points[0])
 
             # Validate minimum requirements for a polygon
@@ -845,3 +840,26 @@ class DWGParser:
         except Exception as e:
             # Suppress repeated error messages for cleaner console output
             return None
+#Fix indentation error and complete the incomplete line
+    def _clean_polygon_points(self, points):
+        """Clean polygon points by removing duplicates and ensuring proper closure"""
+        if not points or len(points) < 3:
+            return []
+
+        # Remove consecutive duplicate points
+        cleaned = []
+        for point in points:
+            if not cleaned or (abs(point[0] - cleaned[-1][0]) > 1e-6 or 
+                             abs(point[1] - cleaned[-1][1]) > 1e-6):
+                cleaned.append(point)
+
+        # Ensure we have enough points for a polygon
+        if len(cleaned) < 3:
+            return []
+
+        # Remove the last point if it's the same as the first (Shapely handles closure)
+        if len(cleaned) > 3 and (abs(cleaned[0][0] - cleaned[-1][0]) < 1e-6 and 
+                                abs(cleaned[0][1] - cleaned[-1][1]) < 1e-6):
+            cleaned = cleaned[:-1]
+
+        return cleaned
