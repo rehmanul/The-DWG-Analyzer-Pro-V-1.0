@@ -6,7 +6,7 @@ packages = ["boost", "cairo", "ffmpeg-full", "freetype", "geos", "ghostscript", 
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["streamlit", "run", "app.py", "--server.port", "5000"]
+run = ["sh", "-c", "streamlit run app.py --server.port 8501 --server.address 0.0.0.0"]
 
 [workflows]
 runButton = "Project"
