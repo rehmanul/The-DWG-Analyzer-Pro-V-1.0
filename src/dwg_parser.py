@@ -27,30 +27,49 @@ class DWGParser:
             List of zone dictionaries with points and metadata
         """
         zones = []
-        
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as temp_file:
-            temp_file.write(file_bytes)
-            temp_file_path = temp_file.name
+        temp_file_path = None
         
         try:
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as temp_file:
+                temp_file.write(file_bytes)
+                temp_file_path = temp_file.name
+            
             # Try to read the DXF/DWG file
             try:
                 doc = ezdxf.readfile(temp_file_path)
-            except ezdxf.DXFStructureError:
-                # Try with recovery mode for corrupted files
-                doc = ezdxf.recover.readfile(temp_file_path)
+                print(f"Successfully opened {filename}")
+            except ezdxf.DXFStructureError as e:
+                print(f"DXF Structure Error, trying recovery: {e}")
+                try:
+                    doc = ezdxf.recover.readfile(temp_file_path)
+                    print(f"Recovery successful for {filename}")
+                except Exception as recovery_error:
+                    print(f"Recovery failed: {recovery_error}")
+                    raise Exception(f"File appears to be corrupted and cannot be recovered: {str(recovery_error)}")
+            except Exception as e:
+                print(f"General error reading file: {e}")
+                raise Exception(f"Cannot read file {filename}. Please ensure it's a valid DWG/DXF file: {str(e)}")
             
             modelspace = doc.modelspace()
+            print(f"Modelspace entities: {len(list(modelspace))}")
             
             # Extract layers information
             layers = self._extract_layers(doc)
+            print(f"Found {len(layers)} layers")
             
             # Parse different entity types
-            zones.extend(self._parse_lwpolylines(modelspace))
-            zones.extend(self._parse_polylines(modelspace))
-            zones.extend(self._parse_hatches(modelspace))
-            zones.extend(self._parse_closed_shapes(modelspace))
+            lwpoly_zones = self._parse_lwpolylines(modelspace)
+            poly_zones = self._parse_polylines(modelspace)
+            hatch_zones = self._parse_hatches(modelspace)
+            shape_zones = self._parse_closed_shapes(modelspace)
+            
+            zones.extend(lwpoly_zones)
+            zones.extend(poly_zones)
+            zones.extend(hatch_zones)
+            zones.extend(shape_zones)
+            
+            print(f"Parsed zones: LWPoly={len(lwpoly_zones)}, Poly={len(poly_zones)}, Hatch={len(hatch_zones)}, Shapes={len(shape_zones)}")
             
             # Add layer information to zones
             for zone in zones:
@@ -59,8 +78,10 @@ class DWGParser:
                     zone['layer_info'] = layers[layer_name]
             
         except ezdxf.DXFError as e:
+            print(f"DXF Error: {e}")
             raise Exception(f"DXF parsing error: {str(e)}")
         except Exception as e:
+            print(f"Parsing error: {e}")
             raise Exception(f"File parsing error: {str(e)}")
         finally:
             # Clean up temporary file

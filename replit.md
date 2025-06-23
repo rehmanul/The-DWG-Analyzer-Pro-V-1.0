@@ -112,6 +112,10 @@ The AI Architectural Space Analyzer Pro is a comprehensive Streamlit-based appli
 
 # Changelog
 - June 23, 2025: **PRODUCTION LAUNCH** - Complete transformation from mock/dummy to full production system
+- June 23, 2025: Fixed all plotly.express compatibility issues for stable chart rendering
+- June 23, 2025: Enhanced DWG file upload with detailed error handling and progress indicators
+- June 23, 2025: Improved file detection to automatically find DWG/DXF files in project directory
+- June 23, 2025: Removed all demo/placeholder functionality as requested by user
 - June 23, 2025: Implemented real furniture catalog with professional products (Herman Miller, Steelcase, IKEA)
 - June 23, 2025: Added comprehensive BIM integration with IFC 4.0 compliance
 - June 23, 2025: Created professional CAD export functionality (DXF, SVG, PDF)

@@ -1056,18 +1056,32 @@ def main():
             if st.button("Load Uploaded File", type="primary"):
                 try:
                     file_bytes = uploaded_file.getvalue()
-                    parser = DWGParser()
-                    zones = parser.parse_file(file_bytes, uploaded_file.name)
-                    if zones:
+                    file_size_mb = len(file_bytes) / (1024 * 1024)
+                    
+                    with st.spinner(f"Processing {uploaded_file.name} ({file_size_mb:.1f} MB)..."):
+                        parser = DWGParser()
+                        zones = parser.parse_file(file_bytes, uploaded_file.name)
+                    
+                    if zones and len(zones) > 0:
                         st.session_state.zones = zones
                         st.session_state.file_loaded = True
                         st.session_state.current_file = uploaded_file.name
                         st.success(f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'")
                         st.rerun()
                     else:
-                        st.error("Could not parse the uploaded file")
+                        st.warning("No zones found in the uploaded file. The file may not contain recognizable room boundaries or closed polygons.")
+                        st.info("This could happen if the file contains only lines, points, or text without closed room boundaries.")
+                        
                 except Exception as e:
-                    st.error(f"Error processing file: {str(e)}")
+                    error_msg = str(e)
+                    st.error(f"Failed to process file: {error_msg}")
+                    
+                    if "corrupted" in error_msg.lower():
+                        st.info("The file appears to be corrupted. Try exporting it again from your CAD software.")
+                    elif "cannot read" in error_msg.lower():
+                        st.info("Make sure the file is a valid DWG or DXF format and not password protected.")
+                    else:
+                        st.info("Try using a different file or contact support if the issue persists.")
         
         # Available files option
         if sample_files:
