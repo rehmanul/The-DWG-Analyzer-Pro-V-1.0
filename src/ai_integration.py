@@ -137,9 +137,8 @@ class GeminiAIAnalyzer(MultiAIAnalyzer):
 
             Based on these architectural measurements, classify this room type and provide confidence score.
             """
-            response = self.model.generate_content(zone_description)
-
-
+            response = self.model.generate_content(
+                zone_description,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.7,
                     top_p=1,
@@ -147,7 +146,6 @@ class GeminiAIAnalyzer(MultiAIAnalyzer):
                     max_output_tokens=2048
                 )
             )
-            }
             if response.text:
                 try:
                     result = json.loads(response.text)

@@ -1,15 +1,15 @@
-modules = ["python-3.11", "postgresql-16"]
+modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["boost", "cairo", "ffmpeg-full", "freetype", "geos", "ghostscript", "glibcLocales", "gobject-introspection", "gtk3", "icu", "libGL", "libGLU", "libxcrypt", "opencascade-occt", "opencollada", "pcre", "pkg-config", "qhull", "swig", "tcl", "tk", "xsimd"]
+packages = ["boost", "cairo", "ffmpeg-full", "freetype", "geos", "ghostscript", "glibcLocales", "gobject-introspection", "gtk3", "gumbo", "harfbuzz", "icu", "jbig2dec", "libGL", "libGLU", "libjpeg_turbo", "libxcrypt", "mupdf", "opencascade-occt", "opencollada", "openjpeg", "pcre", "pkg-config", "qhull", "swig", "tcl", "tk", "xcbuild", "xsimd"]
 
 [deployment]
 deploymentTarget = "autoscale"
 run = ["streamlit", "run", "app.py", "--server.port", "5000"]
 
 [workflows]
-runButton = "Start DWG Analyzer"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
@@ -56,7 +56,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS false"
+args = "streamlit run app.py --server.address 0.0.0.0 --server.port 5000"
 waitForPort = 5000
 
 [[workflows.workflow]]
