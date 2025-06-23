@@ -1089,29 +1089,8 @@ def main():
                 st.success("Demo data generated!")
                 st.rerun()
 
-        if uploaded_file is not None:
-            try:
-                if isinstance(uploaded_file, list):
-                    # Multiple files
-                    st.write(f"Selected {len(uploaded_file)} files")
-                    total_size = sum(f.size for f in uploaded_file) / (1024*1024)
-                    st.write(f"Total size: {total_size:.1f} MB")
-
-                    if st.button("Load Multiple Files", type="primary"):
-                        load_multiple_dwg_files(uploaded_file)
-                else:
-                    # Single file
-                    file_size_mb = uploaded_file.size / (1024*1024)
-                    st.write(f"File: {uploaded_file.name}")
-                    st.write(f"Size: {file_size_mb:.1f} MB")
-
-                    if st.button("Load & Parse File", type="primary"):
-                        if file_size_mb > 200:
-                            st.error("File too large. Maximum size is 200MB.")
-                        else:
-                            load_dwg_file(uploaded_file)
-            except Exception as e:
-                st.error(f"File handling error: {str(e)}")
+        # Analysis parameters section
+        st.divider()
 
         st.divider()
 
