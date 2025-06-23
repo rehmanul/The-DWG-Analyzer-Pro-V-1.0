@@ -578,24 +578,15 @@ def display_advanced_analysis_dashboard(components):
                 run_advanced_analysis(components)
             
             if st.button("🏗️ Generate BIM Model", use_container_width=True, key="dashboard_bim_generate"):
-                if st.session_state.analysis_results:
-                    generate_bim_model(components)
-                else:
-                    st.warning("Please run analysis first")
+                generate_bim_model(components)
         
         with col2:
             st.write("**Specialized Analysis**") 
             if st.button("🪑 Furniture Analysis", use_container_width=True, key="dashboard_furniture_analysis"):
-                if st.session_state.analysis_results:
-                    run_furniture_analysis(components)
-                else:
-                    st.warning("Please run analysis first")
+                run_furniture_analysis(components)
             
             if st.button("📐 CAD Export Package", use_container_width=True, key="dashboard_cad_export"):
-                if st.session_state.analysis_results:
-                    generate_cad_export(components)
-                else:
-                    st.warning("Please run analysis first")
+                generate_cad_export(components)
         
         return
 
