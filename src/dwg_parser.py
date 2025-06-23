@@ -35,7 +35,14 @@ class DWGParser:
                 temp_file.write(file_bytes)
                 temp_file_path = temp_file.name
             
-            # Try to read the DXF/DWG file
+            # Check file format and handle accordingly
+            file_ext = Path(filename).suffix.lower()
+            
+            if file_ext == '.dwg':
+                # Native DWG files are not supported by ezdxf
+                raise Exception(f"Native DWG files are not currently supported. Please convert '{filename}' to DXF format using AutoCAD, LibreCAD, or FreeCAD and try again. Most CAD software can export to DXF format.")
+            
+            # Try to read the DXF file
             try:
                 doc = ezdxf.readfile(temp_file_path)
                 print(f"Successfully opened {filename}")
@@ -49,7 +56,10 @@ class DWGParser:
                     raise Exception(f"File appears to be corrupted and cannot be recovered: {str(recovery_error)}")
             except Exception as e:
                 print(f"General error reading file: {e}")
-                raise Exception(f"Cannot read file {filename}. Please ensure it's a valid DWG/DXF file: {str(e)}")
+                if "not a DXF file" in str(e):
+                    raise Exception(f"File '{filename}' is not in DXF format. Please save/export your drawing as DXF format and try again.")
+                else:
+                    raise Exception(f"Cannot read file {filename}: {str(e)}")
             
             modelspace = doc.modelspace()
             print(f"Modelspace entities: {len(list(modelspace))}")

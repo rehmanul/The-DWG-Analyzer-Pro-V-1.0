@@ -61,7 +61,7 @@ The AI Architectural Space Analyzer Pro is a comprehensive Streamlit-based appli
 # External Dependencies
 
 ## Core Dependencies
-- **ezdxf**: DWG/DXF file parsing and CAD data extraction
+- **ezdxf**: DXF file parsing and CAD data extraction (DWG files require conversion to DXF)
 - **shapely**: Geometric operations and polygon analysis
 - **plotly**: Interactive visualization and charting
 - **streamlit**: Web application framework

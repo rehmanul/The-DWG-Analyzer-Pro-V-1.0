@@ -1032,24 +1032,32 @@ def main():
         # File input section
         st.subheader("📁 File Input")
         
-        # Check multiple possible locations for DWG files
+        # Check multiple possible locations for DXF files
         sample_files = {}
         search_paths = [Path("attached_assets"), Path("."), Path("sample_files")]
         
         for search_path in search_paths:
             if search_path.exists():
-                for pattern in ["*.dwg", "*.dxf"]:
-                    for file_path in search_path.glob(pattern):
-                        if file_path.stat().st_size > 0:
-                            display_name = file_path.stem.replace("_", " ").replace("-", " ").title()
-                            sample_files[display_name] = str(file_path)
+                # Only look for DXF files since DWG is not supported
+                for file_path in search_path.glob("*.dxf"):
+                    if file_path.stat().st_size > 0:
+                        display_name = file_path.stem.replace("_", " ").replace("-", " ").title()
+                        sample_files[display_name] = str(file_path)
+                        
+                # Show DWG files but mark them as requiring conversion
+                dwg_files = list(search_path.glob("*.dwg"))
+                if dwg_files:
+                    st.warning(f"Found {len(dwg_files)} DWG file(s) that need conversion to DXF format:")
+                    for dwg_file in dwg_files:
+                        st.write(f"• {dwg_file.name} - Requires conversion to DXF")
         
         # Upload option
-        st.write("**Option 1: Upload DWG/DXF File**")
+        st.write("**Option 1: Upload DXF File**")
+        st.info("📋 **Important:** This application currently supports DXF format only. If you have a DWG file, please convert it to DXF using AutoCAD, LibreCAD, FreeCAD, or any CAD software.")
         uploaded_file = st.file_uploader(
-            "Upload your architectural drawing",
-            type=['dwg', 'dxf'],
-            help="Select a DWG or DXF file to analyze"
+            "Upload your architectural drawing (DXF format)",
+            type=['dxf'],
+            help="Select a DXF file to analyze. Convert DWG files to DXF format first."
         )
         
         if uploaded_file is not None:
@@ -1085,11 +1093,11 @@ def main():
         
         # Available files option
         if sample_files:
-            st.write("**Option 2: Use Available Files**")
+            st.write("**Option 2: Use Available DXF Files**")
             selected_sample = st.selectbox(
-                "Available architectural files:",
+                "Available DXF files:",
                 options=list(sample_files.keys()),
-                help="Select from files found in the project"
+                help="Select from DXF files found in the project"
             )
             
             if st.button("Load Selected File", key="load_sample"):
@@ -1113,10 +1121,22 @@ def main():
         
         # Instructions for adding files
         if not sample_files and uploaded_file is None:
-            st.info("**How to add DWG/DXF files:**")
-            st.write("1. Use the file uploader above, or")
-            st.write("2. Place your .dwg or .dxf files in the project root directory")
-            st.write("3. Refresh the page to see them in the file list")
+            st.info("**How to add DXF files:**")
+            st.write("1. **Convert DWG to DXF:** Use AutoCAD, LibreCAD, FreeCAD, or online converters")
+            st.write("2. **Upload:** Use the file uploader above")
+            st.write("3. **Local files:** Place .dxf files in the project root directory")
+            
+            with st.expander("🔧 DWG to DXF Conversion Guide"):
+                st.write("**Free Options:**")
+                st.write("• **LibreCAD** - Free, open-source CAD software")
+                st.write("• **FreeCAD** - Open-source 3D CAD software")
+                st.write("• **Online converters** - Search for 'DWG to DXF converter'")
+                st.write("")
+                st.write("**Commercial Options:**")
+                st.write("• **AutoCAD** - File → Save As → DXF format")
+                st.write("• **BricsCAD** - Export → DXF format")
+                st.write("")
+                st.write("💡 **Tip:** When exporting, choose 'ASCII DXF' format for best compatibility.")
 
         # Analysis parameters section
         st.divider()
