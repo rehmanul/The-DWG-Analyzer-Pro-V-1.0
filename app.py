@@ -1412,12 +1412,19 @@ def display_analysis_results():
     room_data = []
     for zone_name, room_info in results.get('rooms', {}).items():
         placements = results.get('placements', {}).get(zone_name, [])
+        # Handle dimensions safely
+        dimensions = room_info.get('dimensions', [0, 0])
+        if isinstance(dimensions, (list, tuple)) and len(dimensions) >= 2:
+            dim_str = f"{dimensions[0]:.1f} × {dimensions[1]:.1f}"
+        else:
+            dim_str = "N/A"
+        
         room_data.append({
             'Zone': zone_name,
             'Room Type': room_info.get('type', 'Unknown'),
             'Confidence': f"{room_info.get('confidence', 0.0):.1%}",
             'Area (m²)': f"{room_info.get('area', 0.0):.1f}",
-            'Dimensions': f"{room_info.get('dimensions', [0, 0])[0]:.1f} × {room_info.get('dimensions', [0, 0])[1]:.1f}",
+            'Dimensions': dim_str,
             'Boxes Placed': len(placements),
             'Layer': room_info.get('layer', 'Unknown')
         })
