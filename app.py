@@ -1104,46 +1104,70 @@ def display_advanced_statistics(components):
 def load_dwg_file(uploaded_file):
     """Load and parse DWG/DXF file"""
     try:
-        with st.spinner("🔄 Loading and parsing DWG file..."):
-            # Check file size
-            file_size = uploaded_file.size
-            if file_size > 200 * 1024 * 1024:  # 200MB limit
-                st.error("File too large. Please use a file smaller than 200MB.")
+        with st.spinner("Loading and parsing DWG file..."):
+            # Validate file
+            if uploaded_file is None:
+                st.error("No file selected.")
                 return
 
-            # Save uploaded file temporarily
-            file_bytes = uploaded_file.read()
+            # Check file extension
+            file_ext = uploaded_file.name.lower().split('.')[-1]
+            if file_ext not in ['dwg', 'dxf']:
+                st.error(f"Unsupported file format: {file_ext}. Please upload a DWG or DXF file.")
+                return
+
+            # Check file size (limit to 50MB for better performance)
+            file_size = uploaded_file.size
+            if file_size > 50 * 1024 * 1024:
+                st.error("File too large. Please use a file smaller than 50MB.")
+                return
+
+            if file_size == 0:
+                st.error("File appears to be empty.")
+                return
+
+            # Read file content
+            try:
+                file_bytes = uploaded_file.getvalue()
+            except Exception:
+                file_bytes = uploaded_file.read()
 
             if len(file_bytes) == 0:
-                st.error("File appears to be empty or corrupted.")
+                st.error("Unable to read file content.")
                 return
 
-            # Parse the DWG/DXF file
-            parser = DWGParser()
-            zones = parser.parse_file(file_bytes, uploaded_file.name)
+            # Create temporary file for processing
+            with tempfile.NamedTemporaryFile(suffix=f'.{file_ext}', delete=False) as tmp_file:
+                tmp_file.write(file_bytes)
+                tmp_file_path = tmp_file.name
 
-            if not zones:
-                st.warning("No valid zones found in the file. Please check if the file contains closed polygons or room boundaries.")
-                return
+            try:
+                # Parse the DWG/DXF file
+                parser = DWGParser()
+                zones = parser.parse_file_from_path(tmp_file_path)
 
-            st.session_state.zones = zones
-            st.session_state.dwg_loaded = True
+                if not zones:
+                    st.warning("No valid zones found in the file. Please check if the file contains closed polygons or room boundaries.")
+                    return
 
-            st.success(f"✅ Successfully loaded {len(zones)} zones from {uploaded_file.name}")
-            st.rerun()
+                st.session_state.zones = zones
+                st.session_state.dwg_loaded = True
+                st.session_state.current_filename = uploaded_file.name
 
-    except PermissionError:
-        st.error("❌ Permission denied. Please try uploading the file again.")
+                st.success(f"Successfully loaded {len(zones)} zones from {uploaded_file.name}")
+                st.rerun()
+
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(tmp_file_path)
+                except:
+                    pass
+
     except Exception as e:
         error_msg = str(e)
-        if "403" in error_msg or "Forbidden" in error_msg:
-            st.error("❌ Upload forbidden. The file might be too large or in an unsupported format. Try a smaller DWG/DXF file.")
-        elif "400" in error_msg or "Bad Request" in error_msg:
-            st.error("❌ Bad request. Please ensure the file is a valid DWG or DXF file.")
-        else:
-            st.error(f"❌ Error loading DWG file: {error_msg}")
-
-        st.info("💡 Try these solutions:\n- Use a smaller file (under 200MB)\n- Ensure the file is a valid DWG/DXF format\n- Try refreshing the page and uploading again")
+        st.error(f"Error loading DWG file: {error_msg}")
+        st.info("Try these solutions: Use a smaller file (under 50MB), ensure the file is a valid DWG/DXF format, or try refreshing the page.")
 
 # Keep existing functions for backward compatibility
 def run_ai_analysis(box_length, box_width, margin, confidence_threshold, enable_rotation, smart_spacing):

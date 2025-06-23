@@ -71,6 +71,43 @@ class DWGParser:
         
         return self._validate_and_clean_zones(zones)
     
+    def parse_file_from_path(self, file_path: str) -> List[Dict[str, Any]]:
+        """Parse DWG/DXF file from file path"""
+        zones = []
+        
+        try:
+            # Try to read the DXF/DWG file
+            try:
+                doc = ezdxf.readfile(file_path)
+            except ezdxf.DXFStructureError:
+                # Try with recovery mode for corrupted files
+                doc = ezdxf.recover.readfile(file_path)
+            
+            modelspace = doc.modelspace()
+            
+            # Extract layers information
+            layers = self._extract_layers(doc)
+            
+            # Parse different entity types
+            zones.extend(self._parse_lwpolylines(modelspace))
+            zones.extend(self._parse_polylines(modelspace))
+            zones.extend(self._parse_hatches(modelspace))
+            zones.extend(self._parse_closed_shapes(modelspace))
+            
+            # Filter out very small zones (likely noise)
+            zones = [zone for zone in zones if zone.get('area', 0) > 0.1]
+            
+            # Add zone IDs
+            for i, zone in enumerate(zones):
+                zone['id'] = f"zone_{i+1}"
+                zone['layers'] = layers
+                
+        except Exception as e:
+            print(f"Error parsing DWG file: {str(e)}")
+            return []
+        
+        return self._validate_and_clean_zones(zones)
+    
     def _extract_layers(self, doc) -> Dict[str, Dict]:
         """Extract layer information from the document"""
         layers = {}
