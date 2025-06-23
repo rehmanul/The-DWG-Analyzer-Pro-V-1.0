@@ -934,7 +934,7 @@ def run_furniture_analysis(components):
             st.success(f"Furniture analysis complete! {total_items} items, ${total_cost:,.0f} total cost")
 
     except Exception as e:
-        st.error(f"Error in furniture analysis: {str(e)}")e)}")
+        st.error(f"Error in furniture analysis: {str(e)}")
 
 def generate_cad_export(components):
     """Generate CAD export package"""
