@@ -351,16 +351,16 @@ def display_integrated_control_panel(components):
     col1, col2 = st.columns([3, 2])
 
     with col1:
-        st.subheader("📁 Upload DXF File")
+        st.subheader("📁 Upload DWG/DXF File")
         st.info(
-            "📋 **Important:** This application supports DXF format. Convert DWG files to DXF using AutoCAD, LibreCAD, FreeCAD, or online converters."
+            "📋 **Enhanced Support:** Upload DWG or DXF files directly. The system supports multiple DWG formats with automatic conversion fallbacks."
         )
 
         uploaded_file = st.file_uploader(
-            "Select your architectural drawing (DXF format)",
-            type=['dxf'],
+            "Select your architectural drawing (DWG/DXF format)",
+            type=['dwg', 'dxf'],
             help=
-            "Upload a DXF file to analyze. Convert DWG files to DXF format first.",
+            "Upload a DWG or DXF file to analyze. Native DWG support included.",
             key="main_file_uploader")
 
         if uploaded_file is not None:
@@ -377,7 +377,7 @@ def display_integrated_control_panel(components):
     with col2:
         st.subheader("📋 Available Files")
 
-        # Check for available DXF files
+        # Check for available DWG/DXF files
         sample_files = {}
         search_paths = [
             Path("attached_assets"),
@@ -387,17 +387,19 @@ def display_integrated_control_panel(components):
 
         for search_path in search_paths:
             if search_path.exists():
-                for file_path in search_path.glob("*.dxf"):
-                    if file_path.stat().st_size > 0:
-                        display_name = file_path.stem.replace(
-                            "_", " ").replace("-", " ").title()
-                        sample_files[display_name] = str(file_path)
+                # Look for both DWG and DXF files
+                for pattern in ["*.dwg", "*.dxf"]:
+                    for file_path in search_path.glob(pattern):
+                        if file_path.stat().st_size > 0:
+                            display_name = file_path.stem.replace(
+                                "_", " ").replace("-", " ").title()
+                            sample_files[display_name] = str(file_path)
 
         if sample_files:
             selected_sample = st.selectbox(
-                "Available DXF files:",
+                "Available DWG/DXF files:",
                 options=list(sample_files.keys()),
-                help="Select from DXF files found in the project",
+                help="Select from DWG/DXF files found in the project",
                 key="main_sample_select")
 
             if st.button("Load Selected",
@@ -406,7 +408,7 @@ def display_integrated_control_panel(components):
                 load_sample_file(sample_files[selected_sample],
                                  selected_sample)
         else:
-            st.info("No DXF files found in project directories")
+            st.info("No DWG/DXF files found in project directories")
 
     # File format help
     with st.expander("🔧 Need to convert DWG to DXF?"):
