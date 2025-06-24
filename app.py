@@ -771,7 +771,31 @@ def load_uploaded_file(uploaded_file):
 
                 # Always proceed with analysis if we have zones
                 if zones and len(zones) > 0:
-                    st.session_state.zones = zones
+                    # Validate zones before storing
+                    validated_zones = []
+                    for i, zone in enumerate(zones):
+                        try:
+                            # Ensure all required fields exist
+                            if 'id' not in zone:
+                                zone['id'] = i
+                            if 'points' not in zone and 'polygon' in zone:
+                                zone['points'] = zone['polygon']
+                            if 'polygon' not in zone and 'points' in zone:
+                                zone['polygon'] = zone['points']
+                            if 'area' not in zone:
+                                zone['area'] = 100.0  # Default area
+                            if 'centroid' not in zone:
+                                zone['centroid'] = (0, 0)
+                            if 'layer' not in zone:
+                                zone['layer'] = '0'
+                            if 'zone_type' not in zone:
+                                zone['zone_type'] = 'Room'
+                            validated_zones.append(zone)
+                        except Exception as zone_error:
+                            logger.warning(f"Skipping invalid zone {i}: {zone_error}")
+                            continue
+                    
+                    st.session_state.zones = validated_zones
                     st.session_state.file_loaded = True
                     st.session_state.current_file = uploaded_file.name
                     st.session_state.dwg_loaded = True
@@ -1451,19 +1475,24 @@ def run_advanced_analysis(components):
             if gemini_analyzer and gemini_analyzer.available:
                 for zone_name, room_info in room_analysis.items():
                     try:
-                        zone_index = int(zone_name.split('_')[1])
-                        zone_data = st.session_state.zones[zone_index]
-                        ai_result = gemini_analyzer.analyze_room_type(
-                            zone_data)
+                        # Safer zone index extraction
+                        if '_' in zone_name:
+                            zone_index_str = zone_name.split('_')[-1]
+                            zone_index = int(zone_index_str)
+                        else:
+                            zone_index = 0
+                        
+                        # Safe zone access
+                        if 0 <= zone_index < len(st.session_state.zones):
+                            zone_data = st.session_state.zones[zone_index]
+                            ai_result = gemini_analyzer.analyze_room_type(zone_data)
 
-                        # Enhance with AI insights
-                        room_info['ai_type'] = ai_result.get(
-                            'type', room_info['type'])
-                        room_info['ai_confidence'] = ai_result.get(
-                            'confidence', room_info['confidence'])
-                        room_info['reasoning'] = ai_result.get(
-                            'reasoning', 'Geometric analysis')
-                    except:
+                            # Enhance with AI insights
+                            room_info['ai_type'] = ai_result.get('type', room_info.get('type', 'Unknown'))
+                            room_info['ai_confidence'] = ai_result.get('confidence', room_info.get('confidence', 0.7))
+                            room_info['reasoning'] = ai_result.get('reasoning', 'Geometric analysis')
+                    except Exception as e:
+                        logger.warning(f"AI enhancement failed for {zone_name}: {e}")
                         pass  # Keep original classification if AI fails
 
             # Step 2: Semantic space analysis
@@ -2093,9 +2122,18 @@ def display_analysis_results():
             placements = results.get('placements', {}).get(zone_name, [])
             # Handle dimensions safely
             dimensions = room_info.get('dimensions', [0, 0])
-            if isinstance(dimensions, (list, tuple)) and len(dimensions) >= 2:
-                dim_str = f"{dimensions[0]:.1f} × {dimensions[1]:.1f}"
-            else:
+            try:
+                if isinstance(dimensions, (list, tuple)) and len(dimensions) >= 2:
+                    dim_str = f"{dimensions[0]:.1f} × {dimensions[1]:.1f}"
+                else:
+                    # Calculate from area if dimensions missing
+                    area = room_info.get('area', 0)
+                    if area > 0:
+                        side_length = math.sqrt(area)
+                        dim_str = f"{side_length:.1f} × {side_length:.1f}"
+                    else:
+                        dim_str = "N/A"
+            except (TypeError, ValueError, IndexError):
                 dim_str = "N/A"
 
             room_data.append({

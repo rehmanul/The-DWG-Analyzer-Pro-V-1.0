@@ -49,30 +49,39 @@ class RobustErrorHandler:
         default_zones = [
             {
                 'id': 0,
+                'points': [(0, 0), (600, 0), (600, 400), (0, 400)],  # Use 'points' consistently
                 'polygon': [(0, 0), (600, 0), (600, 400), (0, 400)],
                 'area': 240000,
                 'centroid': (300, 200),
+                'dimensions': [600, 400],
                 'layer': '0',
                 'zone_type': 'Office',
-                'parsing_method': 'default_fallback'
+                'parsing_method': 'default_fallback',
+                'bounds': (0, 0, 600, 400)
             },
             {
                 'id': 1,
+                'points': [(600, 0), (1000, 0), (1000, 400), (600, 400)],
                 'polygon': [(600, 0), (1000, 0), (1000, 400), (600, 400)],
                 'area': 160000,
                 'centroid': (800, 200),
+                'dimensions': [400, 400],
                 'layer': '0',
                 'zone_type': 'Conference Room',
-                'parsing_method': 'default_fallback'
+                'parsing_method': 'default_fallback',
+                'bounds': (600, 0, 1000, 400)
             },
             {
                 'id': 2,
+                'points': [(0, 400), (1000, 400), (1000, 600), (0, 600)],
                 'polygon': [(0, 400), (1000, 400), (1000, 600), (0, 600)],
                 'area': 200000,
                 'centroid': (500, 500),
+                'dimensions': [1000, 200],
                 'layer': '0',
                 'zone_type': 'Reception',
-                'parsing_method': 'default_fallback'
+                'parsing_method': 'default_fallback',
+                'bounds': (0, 400, 1000, 600)
             }
         ]
         

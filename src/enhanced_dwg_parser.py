@@ -66,9 +66,22 @@ class EnhancedDWGParser:
         try:
             points = []
             if hasattr(entity, 'get_points'):
-                points = [(p[0], p[1]) for p in entity.get_points()]
+                try:
+                    point_list = list(entity.get_points())
+                    points = [(p[0], p[1]) for p in point_list if len(p) >= 2]
+                except Exception:
+                    points = []
             elif hasattr(entity, 'vertices'):
-                points = [(v.dxf.location[0], v.dxf.location[1]) for v in entity.vertices]
+                try:
+                    vertices = list(entity.vertices)
+                    points = []
+                    for v in vertices:
+                        if hasattr(v, 'dxf') and hasattr(v.dxf, 'location'):
+                            loc = v.dxf.location
+                            if len(loc) >= 2:
+                                points.append((loc[0], loc[1]))
+                except Exception:
+                    points = []
 
             if len(points) < 3:
                 return None
@@ -78,7 +91,7 @@ class EnhancedDWGParser:
             centroid = self._calculate_centroid(points)
 
             return {
-                'id': len(points),  # Simple ID based on point count
+                'id': hash(str(points[:3])),  # Safer ID generation
                 'polygon': points,
                 'area': abs(area),
                 'centroid': centroid,
