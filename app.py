@@ -530,10 +530,10 @@ def display_integrated_control_panel(components):
         with col3:
             enable_rotation = st.checkbox("Allow Box Rotation",
                                           value=True,
-                                          key="main_rotation")
+                                          key="integrated_control_rotation")
             smart_spacing = st.checkbox("Smart Spacing Optimization",
                                         value=True,
-                                        key="main_spacing")
+                                        key="integrated_control_spacing")
 
     with param_tabs[1]:
         if st.session_state.advanced_mode:
@@ -2042,10 +2042,10 @@ def display_plan_visualization():
 
     with col2:
         st.subheader("🎨 Display Options")
-        show_zones = st.checkbox("Show Zones", value=True, key="display_plan_show_zones")
-        show_boxes = st.checkbox("Show Box Placements", value=True, key="display_plan_show_boxes")
-        show_labels = st.checkbox("Show Labels", value=True, key="display_plan_show_labels")
-        color_by_type = st.checkbox("Color by Room Type", value=True, key="display_plan_color_by_type")
+        show_zones = st.checkbox("Show Zones", value=True, key="plan_viz_show_zones_unique")
+        show_boxes = st.checkbox("Show Box Placements", value=True, key="plan_viz_show_boxes_unique") 
+        show_labels = st.checkbox("Show Labels", value=True, key="plan_viz_show_labels_unique")
+        color_by_type = st.checkbox("Color by Room Type", value=True, key="plan_viz_color_by_type_unique")
 
     with col1:
         # Generate visualization
