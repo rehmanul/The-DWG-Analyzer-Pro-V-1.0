@@ -680,11 +680,12 @@ def compile_parameters():
 
 
 def display_main_interface(components):
-    """Display main interface with analysis results"""
+    """Display main interface with analysis results using full width"""
     st.success(
         f"DWG file loaded successfully! Found {len(st.session_state.zones)} zones"
     )
 
+    # Full-width interface without cramped columns
     if st.session_state.advanced_mode:
         # Advanced interface with more tabs
         tabs = st.tabs([
@@ -709,6 +710,20 @@ def display_main_interface(components):
             display_cad_export_interface(components)
         with tabs[7]:
             display_advanced_settings(components)
+    else:
+        # Standard interface using full width
+        tabs = st.tabs([
+            "Analysis Results", "Plan Visualization", "Statistics", "Export"
+        ])
+
+        with tabs[0]:
+            display_analysis_results()
+        with tabs[1]:
+            display_plan_visualization()
+        with tabs[2]:
+            display_statistics()
+        with tabs[3]:
+            generate_comprehensive_report(components)
 
 
 def display_advanced_analysis_dashboard(components):
@@ -1858,14 +1873,14 @@ def run_ai_analysis(box_length, box_width, margin, confidence_threshold,
 
 
 def display_analysis_results():
-    """Display AI analysis results"""
+    """Display AI analysis results using full width layout"""
     if not st.session_state.analysis_results:
         st.info("Run AI analysis to see results here")
         return
 
     results = st.session_state.analysis_results
 
-    # Summary cards
+    # Full-width summary cards
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
@@ -1888,16 +1903,18 @@ def display_analysis_results():
 
     st.divider()
 
-    # Detailed room analysis
-    st.subheader("🏠 Room Analysis")
+    # Full-width detailed room analysis
+    st.subheader("Room Analysis Details")
 
-    room_data = []
-    for zone_name, room_info in results.get('rooms', {}).items():
-        placements = results.get('placements', {}).get(zone_name, [])
-        # Handle dimensions safely
-        dimensions = room_info.get('dimensions', [0, 0])
-        if isinstance(dimensions, (list, tuple)) and len(dimensions) >= 2:
-            dim_str = f"{dimensions[0]:.1f} × {dimensions[1]:.1f}"
+    # Create expandable sections for better organization
+    with st.container():
+        room_data = []
+        for zone_name, room_info in results.get('rooms', {}).items():
+            placements = results.get('placements', {}).get(zone_name, [])
+            # Handle dimensions safely
+            dimensions = room_info.get('dimensions', [0, 0])
+            if isinstance(dimensions, (list, tuple)) and len(dimensions) >= 2:
+                dim_str = f"{dimensions[0]:.1f} × {dimensions[1]:.1f}"
         else:
             dim_str = "N/A"
 
