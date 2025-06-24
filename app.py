@@ -743,6 +743,7 @@ def load_uploaded_file(uploaded_file):
                 # Enhanced DWG parsing for AC1018 and newer formats
                 if file_ext == 'dwg':
                     try:
+                        from src.enhanced_dwg_parser import parse_dwg_file_enhanced
                         result = parse_dwg_file_enhanced(temp_file_path)
                         if result and result.get('zones'):
                             zones = result['zones']

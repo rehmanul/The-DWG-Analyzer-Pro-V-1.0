@@ -1,21 +1,17 @@
 [server]
+headless = true
 port = 5000
 address = "0.0.0.0"
-headless = true
-enableCORS = false
+enableCORS = true
 enableXsrfProtection = false
 maxUploadSize = 200
 maxMessageSize = 200
-enableWebsocketCompression = false
-
-[browser]
-gatherUsageStats = false
-
-[theme]
-primaryColor = "#1f77b4"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f0f2f6"
-textColor = "#262730"
+fileWatcherType = "none"
+allowRunOnSave = false
 
 [client]
-showErrorDetails = false
+showErrorDetails = true
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
