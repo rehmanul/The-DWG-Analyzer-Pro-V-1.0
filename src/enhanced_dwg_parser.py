@@ -142,16 +142,20 @@ class EnhancedDWGParser:
                 layout = layouts[2]
                 zone_types = ['Main Area', 'Secondary Area', 'Entrance']
             
-            for i, (x1, y1, w, h) in enumerate(layout[:zone_count]):
-                x2, y2 = x1 + w, y1 + h
-                zones.append({
-                    'id': i,
-                    'polygon': [(x1, y1), (x2, y1), (x2, y2), (x1, y2)],
-                    'area': w * h,
-                    'centroid': ((x1 + x2) / 2, (y1 + y2) / 2),
-                    'layer': '0',
-                    'zone_type': zone_types[i % len(zone_types)]
-                })
+            # Ensure we don't exceed available layouts
+            available_layouts = min(len(layout), zone_count)
+            for i in range(available_layouts):
+                if i < len(layout):
+                    x1, y1, w, h = layout[i]
+                    x2, y2 = x1 + w, y1 + h
+                    zones.append({
+                        'id': i,
+                        'polygon': [(x1, y1), (x2, y1), (x2, y2), (x1, y2)],
+                        'area': w * h,
+                        'centroid': ((x1 + x2) / 2, (y1 + y2) / 2),
+                        'layer': '0',
+                        'zone_type': zone_types[i % len(zone_types)]
+                    })
             
             return {
                 'entities': [],

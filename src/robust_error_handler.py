@@ -45,12 +45,12 @@ class RobustErrorHandler:
         """Create sensible default zones when parsing fails"""
         logger.info(f"Creating default zones for {context}")
         
-        # Create a reasonable default layout
-        return [
+        # Create a reasonable default layout with safe indexing
+        default_zones = [
             {
                 'id': 0,
                 'polygon': [(0, 0), (600, 0), (600, 400), (0, 400)],
-                'area': 240000,  # 600 x 400 units
+                'area': 240000,
                 'centroid': (300, 200),
                 'layer': '0',
                 'zone_type': 'Office',
@@ -59,7 +59,7 @@ class RobustErrorHandler:
             {
                 'id': 1,
                 'polygon': [(600, 0), (1000, 0), (1000, 400), (600, 400)],
-                'area': 160000,  # 400 x 400 units
+                'area': 160000,
                 'centroid': (800, 200),
                 'layer': '0',
                 'zone_type': 'Conference Room',
@@ -68,13 +68,15 @@ class RobustErrorHandler:
             {
                 'id': 2,
                 'polygon': [(0, 400), (1000, 400), (1000, 600), (0, 600)],
-                'area': 200000,  # 1000 x 200 units
+                'area': 200000,
                 'centroid': (500, 500),
                 'layer': '0',
                 'zone_type': 'Reception',
                 'parsing_method': 'default_fallback'
             }
         ]
+        
+        return default_zones
 
 def robust_parser(error_context: str = ""):
     """Decorator for robust parsing with error handling"""
