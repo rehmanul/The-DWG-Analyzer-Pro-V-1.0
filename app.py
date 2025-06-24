@@ -339,8 +339,8 @@ def setup_analysis_parameters(components):
                                      max_value=0.95,
                                      value=0.7,
                                      step=0.05)
-    enable_rotation = st.checkbox("Allow Box Rotation", value=True)
-    smart_spacing = st.checkbox("Smart Spacing Optimization", value=True)
+    enable_rotation = st.checkbox("Allow Box Rotation", value=True, key="main_enable_rotation")
+    smart_spacing = st.checkbox("Smart Spacing Optimization", value=True, key="main_smart_spacing")
 
     return {
         'box_length': box_length,
@@ -913,9 +913,9 @@ def display_enhanced_visualization(components):
     with col1:
         view_mode = st.selectbox("View Mode", ["2D Plan", "3D Isometric"])
     with col2:
-        show_furniture = st.checkbox("Show Furniture", value=True)
+        show_furniture = st.checkbox("Show Furniture", value=True, key="viz_show_furniture")
     with col3:
-        show_annotations = st.checkbox("Show Annotations", value=True)
+        show_annotations = st.checkbox("Show Annotations", value=True, key="viz_show_annotations")
 
     # Generate visualization based on mode
     if view_mode == "3D Isometric" and st.session_state.analysis_results:
@@ -1005,13 +1005,13 @@ def display_cad_export_interface(components):
 
     with col1:
         st.subheader("Export Formats")
-        export_dxf = st.checkbox("DXF (AutoCAD)", value=True)
-        export_svg = st.checkbox("SVG (Web)", value=True)
+        export_dxf = st.checkbox("DXF (AutoCAD)", value=True, key="export_dxf_check")
+        export_svg = st.checkbox("SVG (Web)", value=True, key="export_svg_check")
 
     with col2:
         st.subheader("Drawing Options")
-        include_dimensions = st.checkbox("Include Dimensions", value=True)
-        include_furniture = st.checkbox("Include Furniture", value=True)
+        include_dimensions = st.checkbox("Include Dimensions", value=True, key="export_include_dims")
+        include_furniture = st.checkbox("Include Furniture", value=True, key="export_include_furniture")
 
     if st.button("Generate CAD Export", type="primary"):
         try:
@@ -1107,8 +1107,8 @@ def display_advanced_settings(components):
         f"Current setting: {'High Accuracy' if model_accuracy > 0.8 else 'Balanced'}"
     )
 
-    enable_ensemble = st.checkbox("Enable Ensemble Learning", value=True)
-    enable_semantic = st.checkbox("Enable Semantic Analysis", value=True)
+    enable_ensemble = st.checkbox("Enable Ensemble Learning", value=True, key="advanced_enable_ensemble")
+    enable_semantic = st.checkbox("Enable Semantic Analysis", value=True, key="advanced_enable_semantic")
 
     # AI Service Priority
     st.subheader("🔄 AI Service Priority")
@@ -1151,8 +1151,8 @@ def display_advanced_settings(components):
 
     default_export_format = st.selectbox("Default Export Format",
                                          ["PDF", "DXF", "SVG", "JSON", "CSV"])
-    include_metadata = st.checkbox("Include Analysis Metadata", value=True)
-    compress_exports = st.checkbox("Compress Export Files", value=True)
+    include_metadata = st.checkbox("Include Analysis Metadata", value=True, key="bim_include_metadata")
+    compress_exports = st.checkbox("Compress Export Files", value=True, key="bim_compress_exports")
 
     if st.button("Save Export Settings"):
         st.session_state.export_settings = {
@@ -2042,10 +2042,10 @@ def display_plan_visualization():
 
     with col2:
         st.subheader("🎨 Display Options")
-        show_zones = st.checkbox("Show Zones", value=True)
-        show_boxes = st.checkbox("Show Box Placements", value=True)
-        show_labels = st.checkbox("Show Labels", value=True)
-        color_by_type = st.checkbox("Color by Room Type", value=True)
+        show_zones = st.checkbox("Show Zones", value=True, key="plan_show_zones")
+        show_boxes = st.checkbox("Show Box Placements", value=True, key="plan_show_boxes")
+        show_labels = st.checkbox("Show Labels", value=True, key="plan_show_labels")
+        color_by_type = st.checkbox("Color by Room Type", value=True, key="plan_color_by_type")
 
     with col1:
         # Generate visualization
@@ -2207,7 +2207,7 @@ def display_advanced_options():
             st.write("**Analysis Results:**",
                      bool(st.session_state.analysis_results))
 
-            if st.checkbox("Show raw zone data"):
+            if st.checkbox("Show raw zone data", key="stats_show_raw_data"):
                 st.json(st.session_state.zones[:2]
                         )  # Show first 2 zones as example
 
