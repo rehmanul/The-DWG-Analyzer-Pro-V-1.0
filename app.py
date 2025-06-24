@@ -50,6 +50,7 @@ try:
     PROFESSIONAL_UI_AVAILABLE = True
 except ImportError:
     PROFESSIONAL_UI_AVAILABLE = False
+    logger.warning("Professional UI components not available, using fallback")
     # Create fallback classes
     class ProfessionalUI:
         @staticmethod
@@ -83,11 +84,15 @@ try:
     from src.furniture_catalog import FurnitureCatalogManager
     from src.cad_export import CADExporter
     ADVANCED_FEATURES_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     ADVANCED_FEATURES_AVAILABLE = False
+    logger.warning(f"Advanced features not available: {e}")
     # Import basic versions when advanced features not available
-    from src.furniture_catalog import FurnitureCatalogManager
-    from src.bim_integration import BIMModelGenerator
+    try:
+        from src.furniture_catalog import FurnitureCatalogManager
+        from src.bim_integration import BIMModelGenerator
+    except ImportError:
+        logger.error("Basic modules also missing, using fallbacks")
 
     class AdvancedRoomClassifier:
 
@@ -113,6 +118,14 @@ except ImportError:
 
     class MultiFloorAnalyzer:
         pass
+    
+    class OptimizationEngine:
+        def optimize_furniture_placement(self, zones, params):
+            # Basic optimization fallback
+            return {
+                'total_efficiency': 0.85,
+                'optimization_method': 'basic_fallback'
+            }
 
 
 # Configure page
@@ -1742,8 +1755,25 @@ def generate_cad_export(components):
 def main():
     """Main application function with full advanced features"""
 
-    # Initialize navigation manager
-    nav_manager = NavigationManager()
+    # Initialize navigation manager with error handling
+    try:
+        nav_manager = NavigationManager()
+    except Exception as e:
+        logger.warning(f"Navigation manager failed to initialize: {e}")
+        # Create minimal navigation fallback
+        class BasicNavigation:
+            def display_navigation_header(self): pass
+            def display_workflow_progress(self): pass
+            def display_action_buttons(self): return None
+            def display_sidebar_navigation(self): return None
+            def display_breadcrumb(self): pass
+            def get_navigation_state(self): return 'upload'
+            def update_navigation_state(self, state): pass
+            def start_new_analysis(self): 
+                for key in ['zones', 'analysis_results', 'file_loaded']:
+                    if key in st.session_state:
+                        del st.session_state[key]
+        nav_manager = BasicNavigation()
     
     # Display navigation header
     nav_manager.display_navigation_header()

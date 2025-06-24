@@ -223,3 +223,96 @@ class PlanVisualizer:
                 'total_boxes',
                 0) / total_room_area if total_room_area > 0 else 0
             st.metric("Boxes per m²", f"{boxes_per_m2:.2f}")
+"""
+Basic visualization module for DWG analysis
+"""
+
+import plotly.graph_objects as go
+import plotly.express as px
+import numpy as np
+from typing import List, Dict, Any
+
+class PlanVisualizer:
+    """Basic plan visualization class"""
+    
+    def create_basic_plot(self, zones: List[Dict]) -> go.Figure:
+        """Create basic zone visualization"""
+        fig = go.Figure()
+        
+        for i, zone in enumerate(zones):
+            if 'points' in zone and zone['points']:
+                points = zone['points']
+                # Close the polygon
+                x_coords = [p[0] for p in points] + [points[0][0]]
+                y_coords = [p[1] for p in points] + [points[0][1]]
+                
+                fig.add_trace(go.Scatter(
+                    x=x_coords,
+                    y=y_coords,
+                    mode='lines',
+                    fill='toself',
+                    name=f"Zone {i}",
+                    line=dict(width=2)
+                ))
+        
+        fig.update_layout(
+            title="DWG Zone Analysis",
+            xaxis_title="X Coordinate",
+            yaxis_title="Y Coordinate",
+            showlegend=True,
+            width=800,
+            height=600
+        )
+        
+        return fig
+    
+    def create_interactive_plot(self, zones: List[Dict], analysis_results: Dict, 
+                              show_zones: bool = True, show_boxes: bool = True,
+                              show_labels: bool = True, color_by_type: bool = True) -> go.Figure:
+        """Create interactive plot with analysis results"""
+        fig = self.create_basic_plot(zones)
+        
+        if analysis_results and 'placements' in analysis_results:
+            # Add furniture placements
+            for zone_name, placements in analysis_results['placements'].items():
+                for placement in placements:
+                    x, y = placement['position']
+                    fig.add_trace(go.Scatter(
+                        x=[x], y=[y],
+                        mode='markers',
+                        marker=dict(size=10, color='red', symbol='square'),
+                        name='Furniture',
+                        showlegend=False
+                    ))
+        
+        return fig
+    
+    def create_3d_plot(self, zones: List[Dict], analysis_results: Dict) -> go.Figure:
+        """Create 3D visualization"""
+        fig = go.Figure()
+        
+        for i, zone in enumerate(zones):
+            if 'points' in zone and zone['points']:
+                points = zone['points']
+                x_coords = [p[0] for p in points]
+                y_coords = [p[1] for p in points]
+                z_coords = [0] * len(points)  # Ground level
+                
+                fig.add_trace(go.Scatter3d(
+                    x=x_coords,
+                    y=y_coords,
+                    z=z_coords,
+                    mode='markers+lines',
+                    name=f"Zone {i}"
+                ))
+        
+        fig.update_layout(
+            title="3D Plan View",
+            scene=dict(
+                xaxis_title="X",
+                yaxis_title="Y",
+                zaxis_title="Z"
+            )
+        )
+        
+        return fig
