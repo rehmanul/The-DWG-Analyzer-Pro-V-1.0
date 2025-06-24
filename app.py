@@ -14,6 +14,18 @@ import asyncio
 import tempfile
 import os
 import numpy as np
+import logging
+
+# Configure professional logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Import custom modules
 from src.dwg_parser import DWGParser
@@ -29,6 +41,9 @@ from src.optimization import PlacementOptimizer
 # Import database and AI
 from src.database import DatabaseManager
 from src.ai_integration import GeminiAIAnalyzer
+
+# Import professional UI components
+from professional_ui import ProfessionalUI, DataVisualization
 
 # Import advanced features with fallbacks
 try:
@@ -72,10 +87,17 @@ except ImportError:
 
 
 # Configure page
-st.set_page_config(page_title="AI Architectural Space Analyzer",
-                   page_icon="🏗️",
-                   layout="wide",
-                   initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="AI Architectural Space Analyzer PRO",
+    page_icon="🏗️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': "# AI Architectural Space Analyzer PRO\nEnterprise-grade architectural drawing analysis with AI-powered insights"
+    }
+)
 
 
 # Performance optimization
