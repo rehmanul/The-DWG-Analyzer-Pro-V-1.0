@@ -2235,82 +2235,9 @@ def display_statistics():
 
     results = st.session_state.analysis_results
 
-    # Overall statistics
-    st.subheader("📈 Overall Statistics")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        # Room type distribution
-        room_types = [
-            info.get('type', 'Unknown')
-            for info in results.get('rooms', {}).values()
-        ]
-        room_type_counts = pd.Series(room_types).value_counts()
-
-        fig_pie = go.Figure(data=[
-            go.Pie(values=room_type_counts.values,
-                   labels=room_type_counts.index)
-        ])
-        fig_pie.update_layout(title="Room Type Distribution")
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    with col2:
-        # Box placement by room
-        placement_counts = {
-            zone: len(placements)
-            for zone, placements in results.get('placements', {}).items()
-        }
-
-        if placement_counts:
-            # Create DataFrame for Plotly
-            df = pd.DataFrame({
-                'Zone': list(placement_counts.keys()),
-                'Count': list(placement_counts.values())
-            })
-
-            fig_bar = go.Figure(data=[go.Bar(x=df['Zone'], y=df['Count'])])
-            fig_bar.update_layout(title="Boxes per Zone",
-                                  xaxis_title="Zone",
-                                  yaxis_title="Count")
-        else:
-            fig_bar = go.Figure()
-            fig_bar.update_layout(title="No placement data available")
-            fig_bar.update_layout(xaxes=dict(tickangle=45))
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    # Efficiency metrics
-    st.subheader("⚡ Efficiency Metrics")
-
-    # Calculate various efficiency metrics
-    total_room_area = sum(
-        info.get('area', 0.0) for info in results.get('rooms', {}).values())
-    total_boxes = results.get('total_boxes', 0)
-    box_size = results.get('parameters', {}).get('box_size', [2.0, 1.5])
-    total_box_area = total_boxes * box_size[0] * box_size[1]
-    space_utilization = (total_box_area /
-                         total_room_area) * 100 if total_room_area > 0 else 0
-
-    avg_suitability = 0
-    if results.get('placements'):
-        all_scores = []
-        for placements in results.get('placements', {}).values():
-            all_scores.extend([p['suitability_score'] for p in placements])
-        avg_suitability = np.mean(all_scores) if all_scores else 0
-
-    metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
-
-    with metrics_col1:
-        st.metric("Space Utilization", f"{space_utilization:.1f}%")
-
-    with metrics_col2:
-        st.metric("Avg. Suitability Score", f"{avg_suitability:.2f}")
-
-    with metrics_col3:
-        st.metric(
-            "Boxes per m²",
-            f"{results.get('total_boxes', 0)/total_room_area:.2f}"
-            if total_room_area > 0 else "0.00")
+    # Use the visualization module for consistent statistics display
+    visualizer = PlanVisualizer()
+    visualizer.display_statistics(results)
 
 
 def display_advanced_options():
