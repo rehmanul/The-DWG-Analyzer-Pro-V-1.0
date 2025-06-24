@@ -432,8 +432,15 @@ def display_integrated_control_panel(components):
             with col_b:
                 if st.button("Load File",
                              type="primary",
-                             use_container_width=True):
-                    load_uploaded_file(uploaded_file)
+                             use_container_width=True,
+                             key="load_uploaded_file_btn"):
+                    with st.spinner("Loading file..."):
+                        zones = load_uploaded_file(uploaded_file)
+                        if zones:
+                            st.success(f"Successfully loaded {len(zones)} zones from {uploaded_file.name}")
+                            st.rerun()
+                        else:
+                            st.error("Failed to load file or no zones found")
 
     with col2:
         st.subheader("📋 Available Files")
@@ -465,9 +472,15 @@ def display_integrated_control_panel(components):
 
             if st.button("Load Selected",
                          type="secondary",
-                         use_container_width=True):
-                load_sample_file(sample_files[selected_sample],
-                                 selected_sample)
+                         use_container_width=True,
+                         key="load_sample_file_btn"):
+                with st.spinner("Loading sample file..."):
+                    zones = load_sample_file(sample_files[selected_sample], selected_sample)
+                    if zones:
+                        st.success(f"Successfully loaded {len(zones)} zones from {selected_sample}")
+                        st.rerun()
+                    else:
+                        st.error("Failed to load sample file")
         else:
             st.info("No DWG/DXF files found in project directories")
 
@@ -623,11 +636,17 @@ def display_integrated_control_panel(components):
                          type="primary",
                          use_container_width=True,
                          key="main_standard_analysis"):
-                run_ai_analysis(params['box_length'], params['box_width'],
-                                params['margin'],
-                                params['confidence_threshold'],
-                                params['enable_rotation'],
-                                params['smart_spacing'])
+                if st.session_state.zones:
+                    with st.spinner("Running AI analysis..."):
+                        run_ai_analysis(params['box_length'], params['box_width'],
+                                        params['margin'],
+                                        params['confidence_threshold'],
+                                        params['enable_rotation'],
+                                        params['smart_spacing'])
+                        st.success("Analysis completed! View results below.")
+                        st.rerun()
+                else:
+                    st.error("Please load a DWG/DXF file first.")
 
     # Feature overview section
     st.divider()
@@ -1690,8 +1709,14 @@ def main():
             
             # Add analysis button in sidebar for convenience
             if not st.session_state.analysis_results:
-                if st.button("Run Analysis", type="primary", use_container_width=True):
-                    run_ai_analysis(2.0, 1.5, 0.5, 0.7, True, True)
+                if st.button("Run Analysis", type="primary", use_container_width=True, key="sidebar_run_analysis"):
+                    if st.session_state.zones:
+                        with st.spinner("Running analysis..."):
+                            run_ai_analysis(2.0, 1.5, 0.5, 0.7, True, True)
+                            st.success("Analysis completed!")
+                            st.rerun()
+                    else:
+                        st.error("Load a file first")
 
         # Just navigation - no detailed results
         if st.session_state.analysis_results:
