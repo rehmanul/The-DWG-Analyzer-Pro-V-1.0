@@ -1589,11 +1589,16 @@ def main():
         st.info(mode_label)
 
         if st.session_state.zones:
-            st.success(f"✅ File Loaded: {len(st.session_state.zones)} zones")
+            st.success(f"File Loaded: {len(st.session_state.zones)} zones")
+            
+            # Add analysis button in sidebar for convenience
+            if not st.session_state.analysis_results:
+                if st.button("Run Analysis", type="primary", use_container_width=True):
+                    run_ai_analysis(2.0, 1.5, 0.5, 0.7, True, True)
 
         # Just navigation - no detailed results
         if st.session_state.analysis_results:
-            st.success("🤖 Analysis Complete")
+            st.success("Analysis Complete")
             st.caption("View results in main area")
 
     # Display breadcrumb navigation
@@ -1610,6 +1615,7 @@ def main():
             display_main_interface(components)
         elif st.session_state.zones:
             # Show analysis interface when zones loaded but no results yet
+            st.info("File loaded successfully! Click 'Run Analysis' to analyze the zones.")
             display_integrated_control_panel(components)
         else:
             display_integrated_control_panel(components)
@@ -1839,23 +1845,21 @@ def run_ai_analysis(box_length, box_width, margin, confidence_threshold,
             progress_bar.progress(100)
 
             st.session_state.analysis_results = {
-                'rooms':
-                room_analysis,
-                'placements':
-                placement_analysis,
-                'optimization':
-                optimization_results,
-                'parameters':
-                params,
-                'total_boxes':
-                sum(len(spots) for spots in placement_analysis.values())
+                'rooms': room_analysis,
+                'placements': placement_analysis,
+                'optimization': optimization_results,
+                'parameters': params,
+                'total_boxes': sum(len(spots) for spots in placement_analysis.values())
             }
+            
+            # Set analysis completion flag
+            st.session_state.analysis_complete = True
 
             progress_bar.empty()
             status_text.empty()
 
             st.success(
-                f"✅ AI analysis complete! Found {st.session_state.analysis_results.get('total_boxes', 0)} optimal box placements"
+                f"Analysis complete! Found {st.session_state.analysis_results.get('total_boxes', 0)} optimal box placements"
             )
             st.rerun()
 
@@ -1906,18 +1910,18 @@ def display_analysis_results():
             dimensions = room_info.get('dimensions', [0, 0])
             if isinstance(dimensions, (list, tuple)) and len(dimensions) >= 2:
                 dim_str = f"{dimensions[0]:.1f} × {dimensions[1]:.1f}"
-        else:
-            dim_str = "N/A"
+            else:
+                dim_str = "N/A"
 
-        room_data.append({
-            'Zone': zone_name,
-            'Room Type': room_info.get('type', 'Unknown'),
-            'Confidence': f"{room_info.get('confidence', 0.0):.1%}",
-            'Area (m²)': f"{room_info.get('area', 0.0):.1f}",
-            'Dimensions': dim_str,
-            'Boxes Placed': len(placements),
-            'Layer': room_info.get('layer', 'Unknown')
-        })
+            room_data.append({
+                'Zone': zone_name,
+                'Room Type': room_info.get('type', 'Unknown'),
+                'Confidence': f"{room_info.get('confidence', 0.0):.1%}",
+                'Area (m²)': f"{room_info.get('area', 0.0):.1f}",
+                'Dimensions': dim_str,
+                'Boxes Placed': len(placements),
+                'Layer': room_info.get('layer', 'Unknown')
+            })
 
     df = pd.DataFrame(room_data)
     st.dataframe(df, use_container_width=True)
