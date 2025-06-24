@@ -18,6 +18,8 @@ import numpy as np
 # Import custom modules
 from src.dwg_parser import DWGParser
 from src.enhanced_zone_detector import EnhancedZoneDetector
+from src.navigation_manager import NavigationManager
+from src.placement_optimizer import PlacementOptimizer
 from src.pdf_parser import PDFParser
 from src.ai_analyzer import AIAnalyzer
 from src.visualization_new import PlanVisualizer
@@ -1513,13 +1515,37 @@ def generate_cad_export(components):
 def main():
     """Main application function with full advanced features"""
 
+    # Initialize navigation manager
+    nav_manager = NavigationManager()
+    
+    # Display navigation header
+    nav_manager.display_navigation_header()
+    
+    # Display workflow progress
+    nav_manager.display_workflow_progress()
+    
+    # Handle navigation actions
+    action = nav_manager.display_action_buttons()
+    sidebar_action = nav_manager.display_sidebar_navigation()
+    
     # Get advanced components
     components = get_advanced_components()
+    components['navigation'] = nav_manager
+    components['placement_optimizer'] = PlacementOptimizer()
 
+    # Process navigation actions
+    if action == 'run_analysis' or sidebar_action == 'run_analysis':
+        if st.session_state.zones:
+            run_ai_analysis(2.0, 1.5, 0.5, 0.7, True, True)
+    elif action == 'view_results' or sidebar_action == 'view_results':
+        nav_manager.update_navigation_state('results')
+    elif action == 'export_cad' or sidebar_action == 'export_cad':
+        nav_manager.update_navigation_state('export')
+    
     # Header with mode toggle
     col1, col2 = st.columns([4, 1])
     with col1:
-        st.title("🏗️ AI Architectural Space Analyzer PRO")
+        pass  # Title handled by navigation manager
         st.markdown(
             "**Complete Professional Solution for Architectural Analysis & Space Planning**"
         )
@@ -1566,12 +1592,22 @@ def main():
                 if st.button("📐 CAD Export", use_container_width=True):
                     generate_cad_export(components)
 
-    # Main content area with integrated control panel
+    # Display breadcrumb navigation
+    nav_manager.display_breadcrumb()
+    
+    # Main content area with navigation-aware interface
     try:
-        if not st.session_state.zones:
+        nav_state = nav_manager.get_navigation_state()
+        
+        if nav_state == 'upload' or not st.session_state.zones:
             display_integrated_control_panel(components)
+        elif nav_state == 'results' and st.session_state.analysis_complete:
+            display_main_interface(components)
+        elif nav_state == 'export' and st.session_state.analysis_complete:
+            display_cad_export_interface(components)
         else:
             display_main_interface(components)
+            
     except Exception as e:
         st.error(f"Application error: {str(e)}")
         st.info("Please refresh the page and try again")

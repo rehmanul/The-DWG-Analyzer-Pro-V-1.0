@@ -312,22 +312,24 @@ class CADExporter:
                 area = zone.get('area', 0)
 
                 # Add room type label
-                msp.add_text(
+                text_entity = msp.add_text(
                     room_type,
                     dxfattribs={
                         'layer': 'TEXT',
                         'height': self.export_settings['text_height']
                     }
-                ).set_pos((centroid[0], centroid[1] + 1, 0))
+                )
+                text_entity.dxf.insert = (centroid[0], centroid[1] + 1, 0)
 
                 # Add area label
-                msp.add_text(
+                area_entity = msp.add_text(
                     f"{area:.1f} m²",
                     dxfattribs={
                         'layer': 'TEXT',
                         'height': self.export_settings['text_height'] * 0.8
                     }
-                ).set_pos((centroid[0], centroid[1] - 1, 0))
+                )
+                area_entity.dxf.insert = (centroid[0], centroid[1] - 1, 0)
 
     def _add_title_block_dxf(self, msp: Modelspace, results: Dict):
         """Add title block to DXF"""
