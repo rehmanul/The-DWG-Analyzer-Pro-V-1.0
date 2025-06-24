@@ -9,7 +9,7 @@ deploymentTarget = "autoscale"
 run = ["streamlit", "run", "app.py", "--server.port", "5000"]
 
 [workflows]
-runButton = "Project"
+runButton = "Fixed Streamlit Server"
 
 [[workflows.workflow]]
 name = "Project"
@@ -67,6 +67,15 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false"
+
+[[workflows.workflow]]
+name = "Fixed Streamlit Server"
+author = 44205881
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS true --server.enableXsrfProtection false --server.maxUploadSize 200 --server.maxMessageSize 200 --server.fileWatcherType none"
 
 [[ports]]
 localPort = 5000

@@ -420,27 +420,43 @@ def display_integrated_control_panel(components):
         uploaded_file = st.file_uploader(
             "Select your architectural drawing (DWG/DXF format)",
             type=['dwg', 'dxf'],
-            help=
-            "Upload a DWG or DXF file to analyze. Native DWG support included.",
-            key="main_file_uploader")
+            help="Upload a DWG or DXF file to analyze. Maximum file size: 190 MB. Native DWG support included.",
+            key="main_file_uploader",
+            accept_multiple_files=False)
 
         if uploaded_file is not None:
-            col_a, col_b = st.columns([2, 1])
-            with col_a:
+            # Validate file immediately
+            try:
                 file_size_mb = uploaded_file.size / (1024 * 1024)
-                st.write(f"📄 **{uploaded_file.name}** ({file_size_mb:.1f} MB)")
-            with col_b:
-                if st.button("Load File",
-                             type="primary",
-                             use_container_width=True,
-                             key="load_uploaded_file_btn"):
-                    with st.spinner("Loading file..."):
-                        zones = load_uploaded_file(uploaded_file)
-                        if zones:
-                            st.success(f"Successfully loaded {len(zones)} zones from {uploaded_file.name}")
-                            st.rerun()
-                        else:
-                            st.error("Failed to load file or no zones found")
+                if file_size_mb > 190:
+                    st.error(f"⚠️ File too large: {file_size_mb:.1f} MB. Maximum allowed: 190 MB")
+                    st.stop()
+                    
+                col_a, col_b = st.columns([2, 1])
+                with col_a:
+                    st.write(f"📄 **{uploaded_file.name}** ({file_size_mb:.1f} MB)")
+                    if file_size_mb > 50:
+                        st.warning("⏰ Large file detected. Processing may take longer.")
+                        
+                with col_b:
+                    if st.button("Load File",
+                                 type="primary",
+                                 use_container_width=True,
+                                 key="load_uploaded_file_btn"):
+                        try:
+                            with st.spinner("Loading file..."):
+                                zones = load_uploaded_file(uploaded_file)
+                                if zones and len(zones) > 0:
+                                    st.success(f"✅ Successfully loaded {len(zones)} zones from {uploaded_file.name}")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to load file or no zones found")
+                        except Exception as e:
+                            st.error(f"❌ Upload error: {str(e)}")
+                            
+            except Exception as e:
+                st.error(f"⚠️ File validation error: {str(e)}")
+                st.info("💡 Try refreshing the page and uploading again.")
 
     with col2:
         st.subheader("📋 Available Files")
@@ -680,81 +696,122 @@ def display_integrated_control_panel(components):
 
 def load_uploaded_file(uploaded_file):
     """Load uploaded file with enhanced parsing and robust error handling"""
+    if uploaded_file is None:
+        st.error("No file provided")
+        return None
+        
     try:
-        file_bytes = uploaded_file.getvalue()
+        # Validate file first
+        if not uploaded_file.name:
+            st.error("Invalid file: No filename")
+            return None
+            
+        # Check file extension
+        file_ext = uploaded_file.name.lower().split('.')[-1]
+        if file_ext not in ['dwg', 'dxf']:
+            st.error(f"Unsupported file format: {file_ext}. Please upload DWG or DXF files only.")
+            return None
+            
+        # Check file size
+        try:
+            file_bytes = uploaded_file.getvalue()
+        except Exception as e:
+            st.error(f"Could not read file: {str(e)}")
+            return None
+            
+        if not file_bytes or len(file_bytes) == 0:
+            st.error("File appears to be empty")
+            return None
+            
         file_size_mb = len(file_bytes) / (1024 * 1024)
+        
+        if file_size_mb > 190:  # Leave some buffer under 200MB limit
+            st.error(f"File too large ({file_size_mb:.1f} MB). Maximum size is 190 MB.")
+            return None
 
         with st.spinner(f"Processing {uploaded_file.name} ({file_size_mb:.1f} MB)..."):
             # Create temporary file for enhanced parsing
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded_file.name).suffix) as temp_file:
-                temp_file.write(file_bytes)
-                temp_file_path = temp_file.name
+            temp_file_path = None
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_ext}') as temp_file:
+                    temp_file.write(file_bytes)
+                    temp_file_path = temp_file.name
 
-            zones = None
-            parsing_method = None
+                zones = None
+                parsing_method = None
 
-            # Enhanced DWG parsing for AC1018 and newer formats
-            if uploaded_file.name.lower().endswith('.dwg'):
-                try:
-                    result = parse_dwg_file_enhanced(temp_file_path)
-                    if result and result.get('zones'):
-                        zones = result['zones']
-                        parsing_method = result.get('parsing_method', 'enhanced_dwg')
-                        st.info(f"Successfully parsed using {parsing_method} method")
-                except Exception as e:
-                    st.warning(f"Enhanced parsing failed, using standard method")
+                # Enhanced DWG parsing for AC1018 and newer formats
+                if file_ext == 'dwg':
+                    try:
+                        result = parse_dwg_file_enhanced(temp_file_path)
+                        if result and result.get('zones'):
+                            zones = result['zones']
+                            parsing_method = result.get('parsing_method', 'enhanced_dwg')
+                            st.info(f"Successfully parsed using {parsing_method} method")
+                    except Exception as e:
+                        st.warning(f"Enhanced parsing failed: {str(e)[:100]}")
 
-            # Fallback to standard parser
-            if not zones:
-                try:
-                    parser = DWGParser()
-                    zones = parser.parse_file(file_bytes, uploaded_file.name)
-                    parsing_method = 'standard_parser'
-                except Exception as e:
-                    st.warning(f"Standard parsing failed: {str(e)[:100]}")
+                # Fallback to standard parser
+                if not zones:
+                    try:
+                        parser = DWGParser()
+                        zones = parser.parse_file(file_bytes, uploaded_file.name)
+                        parsing_method = 'standard_parser'
+                        if zones:
+                            st.info("Successfully parsed using standard method")
+                    except Exception as e:
+                        st.warning(f"Standard parsing failed: {str(e)[:100]}")
 
-            # Final fallback - create working zones for analysis
-            if not zones:
-                zones = RobustErrorHandler.create_default_zones(uploaded_file.name, "File upload processing")
-                parsing_method = 'intelligent_fallback'
-                st.info(f"Created working layout with {len(zones)} zones for analysis")
+                # Final fallback - create working zones for analysis
+                if not zones:
+                    zones = RobustErrorHandler.create_default_zones(uploaded_file.name, "File upload processing")
+                    parsing_method = 'intelligent_fallback'
+                    st.info(f"Created working layout with {len(zones)} zones for analysis")
 
-        # Always proceed with analysis
-        if zones:
+                # Always proceed with analysis if we have zones
+                if zones and len(zones) > 0:
+                    st.session_state.zones = zones
+                    st.session_state.file_loaded = True
+                    st.session_state.current_file = uploaded_file.name
+                    st.session_state.dwg_loaded = True
+                    st.session_state.analysis_results = {}
+                    st.session_state.analysis_complete = False
+                    
+                    if parsing_method == 'intelligent_fallback':
+                        st.success(f"Ready to analyze with {len(zones)} zones - You can now run AI analysis and placement optimization")
+                    else:
+                        st.success(f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'")
+                    
+                    return zones
+                else:
+                    st.error("Unable to create working zones for analysis")
+                    return None
+                    
+            finally:
+                # Clean up temp file
+                if temp_file_path and os.path.exists(temp_file_path):
+                    try:
+                        os.unlink(temp_file_path)
+                    except:
+                        pass  # Ignore cleanup errors
+
+    except Exception as e:
+        st.error(f"File upload error: {str(e)}")
+        # Emergency fallback
+        try:
+            zones = RobustErrorHandler.create_default_zones(uploaded_file.name if uploaded_file and uploaded_file.name else "unknown_file", "Critical error recovery")
             st.session_state.zones = zones
             st.session_state.file_loaded = True
-            st.session_state.current_file = uploaded_file.name
+            st.session_state.current_file = uploaded_file.name if uploaded_file and uploaded_file.name else "fallback_file"
             st.session_state.dwg_loaded = True
             st.session_state.analysis_results = {}
             st.session_state.analysis_complete = False
             
-            if parsing_method == 'intelligent_fallback':
-                st.success(f"Ready to analyze with {len(zones)} zones - You can now run AI analysis and placement optimization")
-            else:
-                st.success(f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'")
-            
-            st.rerun()
-        else:
-            # This should never happen with robust error handling
-            st.error("Unable to create working zones for analysis")
-
-    except Exception as e:
-        # Emergency fallback
-        zones = RobustErrorHandler.create_default_zones(uploaded_file.name, "Critical error recovery")
-        st.session_state.zones = zones
-        st.session_state.file_loaded = True
-        st.session_state.current_file = uploaded_file.name
-        st.session_state.dwg_loaded = True
-        st.session_state.analysis_results = {}
-        st.session_state.analysis_complete = False
-        
-        st.warning(f"File processing encountered issues, but created a working environment with {len(zones)} zones")
-        st.rerun()
-    
-    finally:
-        # Clean up temp file
-        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
-            os.unlink(temp_file_path)
+            st.warning(f"File processing encountered issues, but created a working environment with {len(zones)} zones")
+            return zones
+        except Exception as fallback_error:
+            st.error(f"Critical error in file processing: {str(fallback_error)}")
+            return None
 
 
 def load_sample_file(sample_path, selected_sample):

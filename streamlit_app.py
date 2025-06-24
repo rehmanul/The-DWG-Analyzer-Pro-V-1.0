@@ -15,19 +15,29 @@ def main():
     # Set production environment variables
     os.environ.setdefault('STREAMLIT_SERVER_HEADLESS', 'true')
     os.environ.setdefault('STREAMLIT_BROWSER_GATHER_USAGE_STATS', 'false')
-    os.environ.setdefault('STREAMLIT_SERVER_ENABLE_CORS', 'false')
+    os.environ.setdefault('STREAMLIT_SERVER_ENABLE_CORS', 'true')
     os.environ.setdefault('STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION', 'false')
+    os.environ.setdefault('STREAMLIT_SERVER_MAX_UPLOAD_SIZE', '200')
+    os.environ.setdefault('STREAMLIT_SERVER_MAX_MESSAGE_SIZE', '200')
     
     # Launch with production configuration
     cmd = [
         sys.executable, "-m", "streamlit", "run", "app.py",
         "--server.port", "5000",
-        "--server.address", "0.0.0.0"
+        "--server.address", "0.0.0.0",
+        "--server.headless", "true",
+        "--server.enableCORS", "true",
+        "--server.enableXsrfProtection", "false",
+        "--server.maxUploadSize", "200",
+        "--server.maxMessageSize", "200",
+        "--server.fileWatcherType", "none",
+        "--server.allowRunOnSave", "false"
     ]
     
     print("🚀 Starting AI Architectural Space Analyzer PRO...")
     print("📊 Production-ready DWG/DXF analysis platform")
     print("🌐 Server: http://0.0.0.0:5000")
+    print("📁 Max file size: 200MB")
     
     subprocess.run(cmd)
 
