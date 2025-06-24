@@ -1450,7 +1450,7 @@ def run_furniture_analysis(components):
                     db_manager.save_furniture_configuration(
                         st.session_state.current_project_id, config.__dict__)
 
-            st.session_state.furniture_configurations = configurationstions
+            st.session_state.furniture_configurations = configurations
 
             total_cost = sum(config.total_cost for config in configurations)
             total_items = sum(config.total_items for config in configurations)
