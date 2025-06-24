@@ -42,8 +42,35 @@ from src.optimization import PlacementOptimizer
 from src.database import DatabaseManager
 from src.ai_integration import GeminiAIAnalyzer
 
-# Import professional UI components
-from professional_ui import ProfessionalUI, DataVisualization
+# Import professional UI components (with fallback)
+try:
+    from professional_ui import ProfessionalUI, DataVisualization
+    PROFESSIONAL_UI_AVAILABLE = True
+except ImportError:
+    PROFESSIONAL_UI_AVAILABLE = False
+    # Create fallback classes
+    class ProfessionalUI:
+        @staticmethod
+        def render_header():
+            st.title("AI Architectural Space Analyzer PRO")
+        
+        @staticmethod
+        def render_metrics_dashboard(zones, analysis_results, placement_results):
+            st.subheader("Analysis Metrics")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Zones Detected", len(zones))
+            with col2:
+                total_area = sum(zone.get('area', 0) for zone in zones)
+                st.metric("Total Area", f"{total_area:,.0f} sq ft")
+            with col3:
+                room_types = len(set(result.get('room_type', 'Unknown') for result in analysis_results.values()))
+                st.metric("Room Types", room_types)
+    
+    class DataVisualization:
+        @staticmethod
+        def create_zone_analysis_chart(zones, analysis_results):
+            return None
 
 # Import advanced features with fallbacks
 try:

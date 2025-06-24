@@ -49,7 +49,7 @@ class ProfessionalUI:
             )
         
         with col3:
-            room_types = len(set(result.get('room_type', 'Unknown") 
+            room_types = len(set(result.get('room_type', 'Unknown') 
                                for result in analysis_results.values()))
             st.metric(
                 label="Room Types Identified",
