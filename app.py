@@ -36,7 +36,7 @@ from src.navigation_manager import NavigationManager
 from src.placement_optimizer import PlacementOptimizer
 from src.pdf_parser import PDFParser
 from src.ai_analyzer import AIAnalyzer
-from src.visualization_new import PlanVisualizer
+from src.visualization import PlanVisualizer
 from src.export_utils import ExportManager
 from src.optimization import PlacementOptimizer
 
