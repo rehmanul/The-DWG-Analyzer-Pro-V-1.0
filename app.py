@@ -2042,10 +2042,10 @@ def display_plan_visualization():
 
     with col2:
         st.subheader("🎨 Display Options")
-        show_zones = st.checkbox("Show Zones", value=True, key="plan_show_zones")
-        show_boxes = st.checkbox("Show Box Placements", value=True, key="plan_show_boxes")
-        show_labels = st.checkbox("Show Labels", value=True, key="plan_show_labels")
-        color_by_type = st.checkbox("Color by Room Type", value=True, key="plan_color_by_type")
+        show_zones = st.checkbox("Show Zones", value=True, key="display_plan_show_zones")
+        show_boxes = st.checkbox("Show Box Placements", value=True, key="display_plan_show_boxes")
+        show_labels = st.checkbox("Show Labels", value=True, key="display_plan_show_labels")
+        color_by_type = st.checkbox("Color by Room Type", value=True, key="display_plan_color_by_type")
 
     with col1:
         # Generate visualization
