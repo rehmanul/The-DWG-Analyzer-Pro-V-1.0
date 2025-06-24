@@ -56,7 +56,7 @@ except ImportError:
         @staticmethod
         def render_header():
             st.title("AI Architectural Space Analyzer PRO")
-        
+
         @staticmethod
         def render_metrics_dashboard(zones, analysis_results, placement_results):
             st.subheader("Analysis Metrics")
@@ -69,7 +69,7 @@ except ImportError:
             with col3:
                 room_types = len(set(result.get('room_type', 'Unknown') for result in analysis_results.values()))
                 st.metric("Room Types", room_types)
-    
+
     class DataVisualization:
         @staticmethod
         def create_zone_analysis_chart(zones, analysis_results):
@@ -118,7 +118,7 @@ except ImportError as e:
 
     class MultiFloorAnalyzer:
         pass
-    
+
     class OptimizationEngine:
         def optimize_furniture_placement(self, zones, params):
             # Basic optimization fallback
@@ -148,7 +148,7 @@ def get_cached_zones():
     return st.session_state.get('zones', [])
 
 
-# Add responsive CSS
+# Add responsive CSS and WebSocket handling
 st.markdown("""
 <style>
     .main .block-container {
@@ -157,35 +157,53 @@ st.markdown("""
         max-width: 100%;
     }
 
-    @media (max-width: 768px) {
-        .main .block-container {
-            padding-left: 1rem;
-            padding-right: 1rem;
-        }
-        .stColumn {
-            width: 100% !important;
-        }
-        .stButton > button {
-            width: 100%;
-            margin: 0.25rem 0;
-        }
+    /* Connection status indicator */
+    .connection-status {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 12px;
     }
-
-    @media (min-width: 1200px) {
-        .main .block-container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-    }
-
-    .stFileUploader {
-        width: 100%;
-    }
-
-    .stAlert {
-        margin: 1rem 0;
-    }
+    .connected { background-color: #4CAF50; color: white; }
+    .disconnected { background-color: #f44336; color: white; }
 </style>
+
+<script>
+    // WebSocket reconnection handling
+    let reconnectAttempt = 0;
+    const maxReconnectAttempts = 5;
+
+    function handleWebSocketClose() {
+        if (reconnectAttempt < maxReconnectAttempts) {
+            setTimeout(() => {
+                console.log('Attempting to reconnect WebSocket...');
+                reconnectAttempt++;
+                // Streamlit will handle the actual reconnection
+            }, 1000 * reconnectAttempt);
+        }
+    }
+
+    // Monitor WebSocket connection
+    const originalWebSocket = window.WebSocket;
+    window.WebSocket = function(url, protocols) {
+        const ws = new originalWebSocket(url, protocols);
+
+        ws.addEventListener('close', () => {
+            console.log('WebSocket closed, attempting reconnection...');
+            handleWebSocketClose();
+        });
+
+        ws.addEventListener('open', () => {
+            console.log('WebSocket connected');
+            reconnectAttempt = 0; // Reset counter on successful connection
+        });
+
+        return ws;
+    };
+</script>
 """,
             unsafe_allow_html=True)
 
@@ -444,13 +462,13 @@ def display_integrated_control_panel(components):
                 if file_size_mb > 190:
                     st.error(f"⚠️ File too large: {file_size_mb:.1f} MB. Maximum allowed: 190 MB")
                     st.stop()
-                    
+
                 col_a, col_b = st.columns([2, 1])
                 with col_a:
                     st.write(f"📄 **{uploaded_file.name}** ({file_size_mb:.1f} MB)")
                     if file_size_mb > 50:
                         st.warning("⏰ Large file detected. Processing may take longer.")
-                        
+
                 with col_b:
                     if st.button("Load File",
                                  type="primary",
@@ -466,7 +484,7 @@ def display_integrated_control_panel(components):
                                     st.error("❌ Failed to load file or no zones found")
                         except Exception as e:
                             st.error(f"❌ Upload error: {str(e)}")
-                            
+
             except Exception as e:
                 st.error(f"⚠️ File validation error: {str(e)}")
                 st.info("💡 Try refreshing the page and uploading again.")
@@ -710,32 +728,32 @@ def load_uploaded_file(uploaded_file):
     if uploaded_file is None:
         st.error("No file provided")
         return None
-        
+
     try:
         # Validate file first
         if not uploaded_file.name:
             st.error("Invalid file: No filename")
             return None
-            
+
         # Check file extension
         file_ext = uploaded_file.name.lower().split('.')[-1]
         if file_ext not in ['dwg', 'dxf']:
             st.error(f"Unsupported file format: {file_ext}. Please upload DWG or DXF files only.")
             return None
-            
+
         # Check file size
         try:
             file_bytes = uploaded_file.getvalue()
         except Exception as e:
             st.error(f"Could not read file: {str(e)}")
             return None
-            
+
         if not file_bytes or len(file_bytes) == 0:
             st.error("File appears to be empty")
             return None
-            
+
         file_size_mb = len(file_bytes) / (1024 * 1024)
-        
+
         if file_size_mb > 190:  # Leave some buffer under 200MB limit
             st.error(f"File too large ({file_size_mb:.1f} MB). Maximum size is 190 MB.")
             return None
@@ -805,24 +823,24 @@ def load_uploaded_file(uploaded_file):
                         except Exception as zone_error:
                             logger.warning(f"Skipping invalid zone {i}: {zone_error}")
                             continue
-                    
+
                     st.session_state.zones = validated_zones
                     st.session_state.file_loaded = True
                     st.session_state.current_file = uploaded_file.name
                     st.session_state.dwg_loaded = True
                     st.session_state.analysis_results = {}
                     st.session_state.analysis_complete = False
-                    
+
                     if parsing_method == 'intelligent_fallback':
                         st.success(f"Ready to analyze with {len(zones)} zones - You can now run AI analysis and placement optimization")
                     else:
                         st.success(f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'")
-                    
+
                     return zones
                 else:
                     st.error("Unable to create working zones for analysis")
                     return None
-                    
+
             finally:
                 # Clean up temp file
                 if temp_file_path and os.path.exists(temp_file_path):
@@ -842,7 +860,7 @@ def load_uploaded_file(uploaded_file):
             st.session_state.dwg_loaded = True
             st.session_state.analysis_results = {}
             st.session_state.analysis_complete = False
-            
+
             st.warning(f"File processing encountered issues, but created a working environment with {len(zones)} zones")
             return zones
         except Exception as fallback_error:
@@ -942,10 +960,10 @@ def display_main_interface(components):
 
 def display_advanced_analysis_dashboard(components):
     """Display advanced analysis dashboard"""
-    
+
     # Always show action buttons at the top
     st.subheader("🚀 Advanced Analysis Controls")
-    
+
     col1, col2 = st.columns(2)
 
     with col1:
@@ -1195,7 +1213,7 @@ def display_advanced_settings(components):
         if st.button("Configure AI Service"):
             st.info(f"""
             To configure {new_ai_service}:
-            
+
             1. Go to the **Secrets** tab in your Replit workspace
             2. Add the appropriate environment variable:
                - Google Gemini: `GEMINI_API_KEY`
@@ -1205,7 +1223,7 @@ def display_advanced_settings(components):
                - Cohere: `COHERE_API_KEY`
                - Hugging Face: `HUGGING_FACE_TOKEN`
             3. Restart the application
-            
+
             The AI service will be automatically detected and integrated.
             """)
 
@@ -1492,7 +1510,7 @@ def run_advanced_analysis(components):
                             zone_index = int(zone_index_str)
                         else:
                             zone_index = 0
-                        
+
                         # Safe zone access
                         if 0 <= zone_index < len(st.session_state.zones):
                             zone_data = st.session_state.zones[zone_index]
@@ -1772,17 +1790,17 @@ def main():
                     if key in st.session_state:
                         del st.session_state[key]
         nav_manager = BasicNavigation()
-    
+
     # Display navigation header
     nav_manager.display_navigation_header()
-    
+
     # Display workflow progress
     nav_manager.display_workflow_progress()
-    
+
     # Handle navigation actions
     action = nav_manager.display_action_buttons()
     sidebar_action = nav_manager.display_sidebar_navigation()
-    
+
     # Get advanced components
     components = get_advanced_components()
     components['navigation'] = nav_manager
@@ -1796,7 +1814,7 @@ def main():
         nav_manager.update_navigation_state('results')
     elif action == 'export_cad' or sidebar_action == 'export_cad':
         nav_manager.update_navigation_state('export')
-    
+
     # Header with mode toggle
     col1, col2 = st.columns([4, 1])
     with col1:
@@ -1821,7 +1839,7 @@ def main():
 
         if st.session_state.zones:
             st.success(f"File Loaded: {len(st.session_state.zones)} zones")
-            
+
             # Add analysis button in sidebar for convenience
             if not st.session_state.analysis_results:
                 if st.button("Run Analysis", type="primary", use_container_width=True, key="sidebar_run_analysis"):
@@ -1838,11 +1856,11 @@ def main():
 
     # Display breadcrumb navigation
     nav_manager.display_breadcrumb()
-    
+
     # Main content area with navigation-aware interface
     try:
         nav_state = nav_manager.get_navigation_state()
-        
+
         if nav_state == 'upload' or not st.session_state.zones:
             display_integrated_control_panel(components)
         elif st.session_state.analysis_results:
@@ -1854,7 +1872,7 @@ def main():
             display_integrated_control_panel(components)
         else:
             display_integrated_control_panel(components)
-            
+
     except Exception as e:
         st.error(f"Application error: {str(e)}")
         st.info("Please refresh the page and try again")
@@ -2088,7 +2106,7 @@ def run_ai_analysis(box_length, box_width, margin, confidence_threshold,
                 'analysis_type': 'standard',
                 'timestamp': datetime.now().isoformat()
             }
-            
+
             # Set analysis completion flag
             st.session_state.analysis_complete = True
             st.session_state.file_loaded = True
