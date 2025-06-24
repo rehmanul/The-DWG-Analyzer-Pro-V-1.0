@@ -136,51 +136,8 @@ class NavigationManager:
         return None
     
     def display_sidebar_navigation(self):
-        """Display sidebar navigation menu"""
-        st.sidebar.title("Navigation")
-        
-        # File management section
-        st.sidebar.subheader("📁 File Management")
-        
-        if st.session_state.current_file:
-            st.sidebar.write(f"Current: {st.session_state.current_file}")
-            if st.sidebar.button("📋 File Details"):
-                return 'file_details'
-        
-        # Quick actions
-        st.sidebar.subheader("⚡ Quick Actions")
-        
-        if st.sidebar.button("🔄 New Analysis", key="sidebar_new"):
-            self.start_new_analysis()
-            st.rerun()
-        
-        if st.session_state.zones:
-            if st.sidebar.button("🔍 Run Analysis", key="sidebar_analyze"):
-                return 'run_analysis'
-        
-        if st.session_state.analysis_complete:
-            if st.sidebar.button("📊 View Results", key="sidebar_results"):
-                return 'view_results'
-            
-            if st.sidebar.button("📐 Export", key="sidebar_export"):
-                return 'export_cad'
-        
-        # Analysis history
-        if st.session_state.analysis_results:
-            st.sidebar.subheader("📈 Analysis Summary")
-            results = st.session_state.analysis_results
-            
-            if 'rooms' in results:
-                room_count = len(results['rooms'])
-                st.sidebar.metric("Rooms Found", room_count)
-            
-            if 'total_boxes' in results:
-                st.sidebar.metric("Items Placed", results['total_boxes'])
-            
-            if 'optimization' in results:
-                efficiency = results['optimization'].get('total_efficiency', 0) * 100
-                st.sidebar.metric("Efficiency", f"{efficiency:.1f}%")
-        
+        """Display minimal sidebar navigation menu"""
+        # Keep sidebar minimal - no detailed analysis results
         return None
     
     def get_available_files(self) -> Dict[str, str]:

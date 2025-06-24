@@ -681,9 +681,18 @@ def compile_parameters():
 
 def display_main_interface(components):
     """Display main interface with analysis results using full width"""
-    st.success(
-        f"DWG file loaded successfully! Found {len(st.session_state.zones)} zones"
-    )
+    # Main content area header
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        st.success(f"Found {len(st.session_state.zones)} zones")
+    with col2:
+        if st.session_state.analysis_results:
+            total_items = st.session_state.analysis_results.get('total_boxes', 0)
+            st.success(f"Analysis Complete: {total_items} items placed")
+    with col3:
+        if st.button("🔄 New File", use_container_width=True):
+            components['navigation'].start_new_analysis()
+            st.rerun()
 
     # Full-width interface without cramped columns
     if st.session_state.advanced_mode:
@@ -1571,7 +1580,7 @@ def main():
             value=st.session_state.advanced_mode,
             key="main_advanced_mode_toggle")
 
-    # Simplified sidebar with just mode toggle
+    # Minimal sidebar - no analysis results here
     with st.sidebar:
         st.header("🎛️ Quick Settings")
 
@@ -1581,31 +1590,11 @@ def main():
 
         if st.session_state.zones:
             st.success(f"✅ File Loaded: {len(st.session_state.zones)} zones")
-            if hasattr(st.session_state, 'current_file'):
-                st.write(f"📄 {st.session_state.current_file}")
 
+        # Just navigation - no detailed results
         if st.session_state.analysis_results:
-            st.success(
-                f"🤖 Analysis Complete: {st.session_state.analysis_results.get('total_boxes', 0)} placements"
-            )
-
-        # Quick actions
-        st.divider()
-        st.subheader("🚀 Quick Actions")
-
-        if st.session_state.analysis_results:
-            if st.button("📊 Generate Report",
-                         type="primary",
-                         use_container_width=True):
-                generate_comprehensive_report(components)
-
-            if st.session_state.advanced_mode:
-                if st.button("🏗️ Generate BIM", use_container_width=True):
-                    generate_bim_model(components)
-                if st.button("🪑 Furniture Analysis", use_container_width=True):
-                    run_furniture_analysis(components)
-                if st.button("📐 CAD Export", use_container_width=True):
-                    generate_cad_export(components)
+            st.success("🤖 Analysis Complete")
+            st.caption("View results in main area")
 
     # Display breadcrumb navigation
     nav_manager.display_breadcrumb()
@@ -1616,12 +1605,14 @@ def main():
         
         if nav_state == 'upload' or not st.session_state.zones:
             display_integrated_control_panel(components)
-        elif nav_state == 'results' and st.session_state.analysis_complete:
+        elif st.session_state.analysis_results:
+            # Always show results in main area when available
             display_main_interface(components)
-        elif nav_state == 'export' and st.session_state.analysis_complete:
-            display_cad_export_interface(components)
+        elif st.session_state.zones:
+            # Show analysis interface when zones loaded but no results yet
+            display_integrated_control_panel(components)
         else:
-            display_main_interface(components)
+            display_integrated_control_panel(components)
             
     except Exception as e:
         st.error(f"Application error: {str(e)}")
