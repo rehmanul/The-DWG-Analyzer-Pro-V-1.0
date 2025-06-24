@@ -672,8 +672,6 @@ def display_integrated_control_panel(components):
                                         params['confidence_threshold'],
                                         params['enable_rotation'],
                                         params['smart_spacing'])
-                        st.success("Analysis completed! View results below.")
-                        st.rerun()
                 else:
                     st.error("Please load a DWG/DXF file first.")
 
@@ -1830,8 +1828,6 @@ def main():
                     if st.session_state.zones:
                         with st.spinner("Running analysis..."):
                             run_ai_analysis(2.0, 1.5, 0.5, 0.7, True, True)
-                            st.success("Analysis completed!")
-                            st.rerun()
                     else:
                         st.error("Load a file first")
 
@@ -2103,7 +2099,6 @@ def run_ai_analysis(box_length, box_width, margin, confidence_threshold,
             st.success(
                 f"Analysis complete! Found {st.session_state.analysis_results.get('total_boxes', 0)} optimal box placements"
             )
-            # Don't rerun immediately - let the UI update naturally
 
     except Exception as e:
         st.error(f"❌ Error during AI analysis: {str(e)}")
