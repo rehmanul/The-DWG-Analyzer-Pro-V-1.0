@@ -12,70 +12,6 @@ run = ["streamlit", "run", "app.py", "--server.port", "5000"]
 runButton = "Start DWG Analyzer"
 
 [[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "streamlit_website"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "DWG Analyzer App"
-
-[[workflows.workflow]]
-name = "streamlit_website"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "uv add ezdxf shapely matplotlib plotly pandas numpy reportlab rectpack opencv-python scikit-learn scipy"
-
-[[workflows.workflow]]
-name = "DWG Analyzer App"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python streamlit_app.py"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "DWG Analyzer Fixed"
-author = 44205881
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pkill -f streamlit"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "sleep 2"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS true --server.enableXsrfProtection false --server.maxUploadSize 200 --server.maxMessageSize 200 --server.fileWatcherType none --server.allowRunOnSave false"
-
-[[workflows.workflow]]
-name = "Start DWG Analyzer"
-author = 44205881
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pkill -f streamlit || true"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "sleep 1"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS true --server.enableXsrfProtection false --server.maxUploadSize 200 --server.maxMessageSize 200"
-
-[[workflows.workflow]]
 name = "Start DWG Analyzer"
 author = 44205881
 mode = "sequential"
@@ -95,11 +31,3 @@ args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --serve
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 5001
-externalPort = 3000
-
-[[ports]]
-localPort = 5002
-externalPort = 3001
