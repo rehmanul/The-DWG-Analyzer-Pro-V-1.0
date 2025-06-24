@@ -426,24 +426,31 @@ FreeCAD.closeDocument(doc.Name)
         zones = []
 
         for entity in modelspace.query('LWPOLYLINE'):
-            if entity.closed:
-                try:
-                    points = [(point[0], point[1]) for point in entity]
-                    if len(points) >= 3:  # Minimum for a polygon
+            try:
+                points = [(point[0], point[1]) for point in entity]
+                if len(points) >= 3:  # Minimum for a polygon
+                    # Check if closed or if first and last points are close
+                    is_closed = entity.closed or (len(points) > 3 and 
+                                abs(points[0][0] - points[-1][0]) < 0.1 and 
+                                abs(points[0][1] - points[-1][1]) < 0.1)
+                    
+                    if is_closed:
+                        # Ensure polygon is properly closed
+                        if points[0] != points[-1]:
+                            points.append(points[0])
+                    
+                    area = self._calculate_polygon_area(points)
+                    if area > 1.0:  # Minimum area threshold
                         zones.append({
-                            'points':
-                            points,
-                            'layer':
-                            entity.dxf.layer,
-                            'entity_type':
-                            'LWPOLYLINE',
-                            'closed':
-                            True,
-                            'area':
-                            self._calculate_polygon_area(points)
+                            'points': points,
+                            'layer': entity.dxf.layer,
+                            'entity_type': 'LWPOLYLINE',
+                            'closed': is_closed,
+                            'area': area,
+                            'perimeter': self._calculate_perimeter(points)
                         })
-                except Exception as e:
-                    continue  # Skip problematic entities
+            except Exception as e:
+                continue  # Skip problematic entities
 
         return zones
 
@@ -480,31 +487,51 @@ FreeCAD.closeDocument(doc.Name)
 
         for entity in modelspace.query('HATCH'):
             try:
-                # Get boundary paths
+                # Get boundary paths - check both external and polyline boundaries
                 for boundary_path in entity.paths:
-                    if boundary_path.path_type_flags & 2:  # External boundary
-                        points = []
-                        for edge in boundary_path.edges:
-                            if edge.EDGE_TYPE == 'LineEdge':
-                                points.append((edge.start[0], edge.start[1]))
-                            elif edge.EDGE_TYPE == 'ArcEdge':
-                                # Approximate arc with line segments
-                                arc_points = self._approximate_arc(edge)
-                                points.extend(arc_points)
-
-                        if len(points) >= 3:
+                    points = []
+                    
+                    # Handle different path types
+                    if hasattr(boundary_path, 'path_type_flags'):
+                        # Check for external boundary or polyline boundary
+                        if boundary_path.path_type_flags & 2 or boundary_path.path_type_flags & 1:
+                            if hasattr(boundary_path, 'edges') and boundary_path.edges:
+                                # Process edges
+                                for edge in boundary_path.edges:
+                                    if hasattr(edge, 'EDGE_TYPE'):
+                                        if edge.EDGE_TYPE == 'LineEdge':
+                                            points.append((edge.start[0], edge.start[1]))
+                                        elif edge.EDGE_TYPE == 'ArcEdge':
+                                            arc_points = self._approximate_arc(edge)
+                                            points.extend(arc_points)
+                            elif hasattr(boundary_path, 'vertices') and boundary_path.vertices:
+                                # Handle polyline boundary
+                                points = [(v[0], v[1]) for v in boundary_path.vertices]
+                    
+                    # Alternative: try to get source boundary objects
+                    if not points and hasattr(boundary_path, 'source_boundary_objects'):
+                        for obj in boundary_path.source_boundary_objects:
+                            if hasattr(obj, 'vertices'):
+                                points = [(v[0], v[1]) for v in obj.vertices]
+                                break
+                    
+                    if len(points) >= 3:
+                        # Ensure closed polygon
+                        if points[0] != points[-1]:
+                            points.append(points[0])
+                        
+                        area = self._calculate_polygon_area(points)
+                        if area > 1.0:  # Minimum area threshold
                             zones.append({
-                                'points':
-                                points,
-                                'layer':
-                                entity.dxf.layer,
-                                'entity_type':
-                                'HATCH',
-                                'closed':
-                                True,
-                                'area':
-                                self._calculate_polygon_area(points)
+                                'points': points,
+                                'layer': entity.dxf.layer,
+                                'entity_type': 'HATCH',
+                                'closed': True,
+                                'area': area,
+                                'perimeter': self._calculate_perimeter(points)
                             })
+                            break  # Only take the first valid boundary
+                            
             except Exception as e:
                 continue
 
@@ -565,6 +592,29 @@ FreeCAD.closeDocument(doc.Name)
             area -= points[j][0] * points[i][1]
 
         return abs(area) / 2.0
+    
+    def _calculate_perimeter(self, points: List[tuple]) -> float:
+        """Calculate polygon perimeter"""
+        if len(points) < 2:
+            return 0.0
+        
+        perimeter = 0.0
+        for i in range(len(points)):
+            j = (i + 1) % len(points)
+            dx = points[j][0] - points[i][0]
+            dy = points[j][1] - points[i][1]
+            perimeter += (dx * dx + dy * dy) ** 0.5
+        
+        return perimeter
+    
+    def _calculate_bounds(self, points: List[tuple]) -> tuple:
+        """Calculate bounding box of points"""
+        if not points:
+            return (0, 0, 0, 0)
+        
+        xs = [p[0] for p in points]
+        ys = [p[1] for p in points]
+        return (min(xs), min(ys), max(xs), max(ys))
 
     def _circle_to_polygon(self,
                            cx: float,

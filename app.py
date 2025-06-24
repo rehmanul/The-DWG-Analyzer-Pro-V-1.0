@@ -134,6 +134,12 @@ if 'placement_results' not in st.session_state:
     st.session_state.placement_results = {}
 if 'dwg_loaded' not in st.session_state:
     st.session_state.dwg_loaded = False
+if 'file_loaded' not in st.session_state:
+    st.session_state.file_loaded = False
+if 'analysis_complete' not in st.session_state:
+    st.session_state.analysis_complete = False
+if 'current_file' not in st.session_state:
+    st.session_state.current_file = None
 if 'bim_model' not in st.session_state:
     st.session_state.bim_model = None
 if 'furniture_configurations' not in st.session_state:
@@ -144,6 +150,8 @@ if 'multi_floor_project' not in st.session_state:
     st.session_state.multi_floor_project = None
 if 'advanced_mode' not in st.session_state:
     st.session_state.advanced_mode = False
+if 'file_upload_key' not in st.session_state:
+    st.session_state.file_upload_key = 0
 
 
 # Initialize advanced components
@@ -615,33 +623,50 @@ def load_uploaded_file(uploaded_file):
             st.session_state.zones = zones
             st.session_state.file_loaded = True
             st.session_state.current_file = uploaded_file.name
+            st.session_state.dwg_loaded = True
+            # Reset analysis state for new file
+            st.session_state.analysis_results = {}
+            st.session_state.analysis_complete = False
+            
             st.success(
                 f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'"
             )
             st.rerun()
         else:
-            st.warning(
-                "No zones found in the uploaded file. The file may not contain recognizable room boundaries or closed polygons."
+            st.error(
+                f"No zones found in '{uploaded_file.name}'. This could be due to:"
             )
-            st.info(
-                "This could happen if the file contains only lines, points, or text without closed room boundaries."
-            )
+            st.info("""
+            **Possible reasons:**
+            - File contains only lines/points without closed room boundaries
+            - Rooms are drawn as separate line segments (not polylines)
+            - File format issues or newer DWG version
+            
+            **Try:**
+            - Ensure rooms are drawn as closed polylines or hatched areas
+            - Convert to DXF format using your CAD software
+            - Check that the drawing contains actual room boundaries
+            """)
 
     except Exception as e:
         error_msg = str(e)
-        st.error(f"Failed to process file: {error_msg}")
+        st.error(f"Failed to process file '{uploaded_file.name}': {error_msg}")
 
-        if "corrupted" in error_msg.lower():
+        if "corrupted" in error_msg.lower() or "cannot be recovered" in error_msg.lower():
             st.info(
-                "The file appears to be corrupted. Try exporting it again from your CAD software."
+                "**File appears corrupted.** Try exporting it again from your CAD software in DXF format."
+            )
+        elif "not in DXF format" in error_msg.lower():
+            st.info(
+                "**DWG format issue.** Please save/export your drawing as DXF format and try again."
             )
         elif "cannot read" in error_msg.lower():
             st.info(
-                "Make sure the file is a valid DWG or DXF format and not password protected."
+                "**File reading issue.** Make sure the file is valid DWG/DXF format and not password protected."
             )
         else:
             st.info(
-                "Try using a different file or contact support if the issue persists."
+                f"**Parsing error.** Try converting to DXF format or use a different file. Error: {error_msg}"
             )
 
 
@@ -737,44 +762,48 @@ def display_main_interface(components):
 
 def display_advanced_analysis_dashboard(components):
     """Display advanced analysis dashboard"""
+    
+    # Always show action buttons at the top
+    st.subheader("🚀 Advanced Analysis Controls")
+    
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("**Core Analysis**")
+        if st.button("🤖 Advanced AI Analysis",
+                     type="primary",
+                     use_container_width=True,
+                     key="dashboard_advanced_analysis"):
+            run_advanced_analysis(components)
+
+        if st.button("🏗️ Generate BIM Model",
+                     use_container_width=True,
+                     key="dashboard_bim_generate"):
+            generate_bim_model(components)
+
+    with col2:
+        st.write("**Specialized Analysis**")
+        if st.button("🪑 Furniture Analysis",
+                     use_container_width=True,
+                     key="dashboard_furniture_analysis"):
+            run_furniture_analysis(components)
+
+        if st.button("📐 CAD Export Package",
+                     use_container_width=True,
+                     key="dashboard_cad_export"):
+            generate_cad_export(components)
+
+    st.divider()
+
+    # Show results if available
     if not st.session_state.analysis_results:
-        st.info("Run advanced analysis to see comprehensive dashboard")
-
-        # Show analysis buttons when no results exist
-        st.subheader("🚀 Start Analysis")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.write("**Core Analysis**")
-            if st.button("🤖 Advanced AI Analysis",
-                         type="primary",
-                         use_container_width=True,
-                         key="dashboard_advanced_analysis"):
-                run_advanced_analysis(components)
-
-            if st.button("🏗️ Generate BIM Model",
-                         use_container_width=True,
-                         key="dashboard_bim_generate"):
-                generate_bim_model(components)
-
-        with col2:
-            st.write("**Specialized Analysis**")
-            if st.button("🪑 Furniture Analysis",
-                         use_container_width=True,
-                         key="dashboard_furniture_analysis"):
-                run_furniture_analysis(components)
-
-            if st.button("📐 CAD Export Package",
-                         use_container_width=True,
-                         key="dashboard_cad_export"):
-                generate_cad_export(components)
-
+        st.info("No analysis results yet. Use the buttons above to start analysis.")
         return
 
     results = st.session_state.analysis_results
 
     # Key metrics
+    st.subheader("📊 Analysis Metrics")
     col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
@@ -786,14 +815,14 @@ def display_advanced_analysis_dashboard(components):
             'total_efficiency', 0.85) * 100
         st.metric("Optimization Efficiency", f"{efficiency:.1f}%")
     with col4:
-        if st.session_state.bim_model:
+        if st.session_state.get('bim_model'):
             compliance = st.session_state.bim_model.standards_compliance[
                 'ifc']['score']
             st.metric("BIM Compliance", f"{compliance:.1f}%")
         else:
             st.metric("BIM Compliance", "Not Generated")
     with col5:
-        if st.session_state.furniture_configurations:
+        if st.session_state.get('furniture_configurations'):
             total_cost = sum(
                 config.total_cost
                 for config in st.session_state.furniture_configurations)
@@ -1849,11 +1878,14 @@ def run_ai_analysis(box_length, box_width, margin, confidence_threshold,
                 'placements': placement_analysis,
                 'optimization': optimization_results,
                 'parameters': params,
-                'total_boxes': sum(len(spots) for spots in placement_analysis.values())
+                'total_boxes': sum(len(spots) for spots in placement_analysis.values()),
+                'analysis_type': 'standard',
+                'timestamp': datetime.now().isoformat()
             }
             
             # Set analysis completion flag
             st.session_state.analysis_complete = True
+            st.session_state.file_loaded = True
 
             progress_bar.empty()
             status_text.empty()
@@ -1861,10 +1893,12 @@ def run_ai_analysis(box_length, box_width, margin, confidence_threshold,
             st.success(
                 f"Analysis complete! Found {st.session_state.analysis_results.get('total_boxes', 0)} optimal box placements"
             )
-            st.rerun()
+            # Don't rerun immediately - let the UI update naturally
 
     except Exception as e:
         st.error(f"❌ Error during AI analysis: {str(e)}")
+        # Reset analysis state on error
+        st.session_state.analysis_complete = False
 
 
 def display_analysis_results():
