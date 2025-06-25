@@ -176,7 +176,7 @@ def get_cached_zones():
     return st.session_state.get('zones', [])
 
 
-# Add responsive CSS and WebSocket handling
+# Add responsive CSS
 st.markdown("""
 <style>
     .main .block-container {
@@ -184,56 +184,18 @@ st.markdown("""
         padding-bottom: 1rem;
         max-width: 100%;
     }
-
-    /* Connection status indicator */
-    .connection-status {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        z-index: 1000;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-size: 12px;
+    
+    /* Improve loading indicators */
+    .stProgress > div > div > div > div {
+        background-color: #00d4aa;
     }
-    .connected { background-color: #4CAF50; color: white; }
-    .disconnected { background-color: #f44336; color: white; }
+    
+    /* Better error styling */
+    .stAlert[data-baseweb="notification"] {
+        border-radius: 0.5rem;
+    }
 </style>
-
-<script>
-    // WebSocket reconnection handling
-    let reconnectAttempt = 0;
-    const maxReconnectAttempts = 5;
-
-    function handleWebSocketClose() {
-        if (reconnectAttempt < maxReconnectAttempts) {
-            setTimeout(() => {
-                console.log('Attempting to reconnect WebSocket...');
-                reconnectAttempt++;
-                // Streamlit will handle the actual reconnection
-            }, 1000 * reconnectAttempt);
-        }
-    }
-
-    // Monitor WebSocket connection
-    const originalWebSocket = window.WebSocket;
-    window.WebSocket = function(url, protocols) {
-        const ws = new originalWebSocket(url, protocols);
-
-        ws.addEventListener('close', () => {
-            console.log('WebSocket closed, attempting reconnection...');
-            handleWebSocketClose();
-        });
-
-        ws.addEventListener('open', () => {
-            console.log('WebSocket connected');
-            reconnectAttempt = 0; // Reset counter on successful connection
-        });
-
-        return ws;
-    };
-</script>
-""",
-            unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # Initialize session state
 if 'zones' not in st.session_state:
@@ -752,13 +714,13 @@ def display_integrated_control_panel(components):
 
 
 def load_uploaded_file(uploaded_file):
-    """Load uploaded file with simplified robust handling"""
+    """Load uploaded file with robust error handling"""
     if uploaded_file is None:
         st.error("No file provided")
         return None
 
     try:
-        # Basic validation
+        # Validate file
         if not uploaded_file.name:
             st.error("Invalid file: No filename")
             return None
@@ -768,53 +730,50 @@ def load_uploaded_file(uploaded_file):
             st.error(f"Unsupported file format: {file_ext}")
             return None
 
-        # Read file with timeout protection
-        try:
-            file_bytes = uploaded_file.getvalue()
-            if not file_bytes:
-                st.error("File appears to be empty")
-                return None
-                
-            file_size_mb = len(file_bytes) / (1024 * 1024)
-            if file_size_mb > 190:
-                st.error(f"File too large ({file_size_mb:.1f} MB)")
-                return None
-                
-        except Exception as e:
-            st.error(f"Could not read file: {str(e)}")
+        # Read file safely
+        file_bytes = uploaded_file.getvalue()
+        if not file_bytes:
+            st.error("File appears to be empty")
+            return None
+            
+        file_size_mb = len(file_bytes) / (1024 * 1024)
+        if file_size_mb > 190:
+            st.error(f"File too large ({file_size_mb:.1f} MB)")
             return None
 
-        # Simple parsing approach
+        # Parse file with fallback
         zones = None
         try:
             parser = DWGParser()
             zones = parser.parse_file(file_bytes, uploaded_file.name)
         except Exception as e:
-            st.warning(f"Standard parsing failed: {str(e)[:100]}")
+            st.warning(f"Parsing failed, using fallback: {str(e)[:50]}...")
 
-        # Create fallback zones if parsing failed
+        # Always ensure we have zones
         if not zones or len(zones) == 0:
             zones = RobustErrorHandler.create_default_zones(uploaded_file.name, "Fallback zones")
             st.info(f"Created working layout with {len(zones)} zones for analysis")
 
-        # Store in session state
-        if zones:
-            st.session_state.zones = zones
-            st.session_state.file_loaded = True
-            st.session_state.current_file = uploaded_file.name
-            st.session_state.dwg_loaded = True
-            st.session_state.analysis_results = {}
-            st.session_state.analysis_complete = False
-            
-            st.success(f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'")
-            return zones
-        else:
-            st.error("Failed to load file")
-            return None
+        # Update session state safely
+        st.session_state.zones = zones
+        st.session_state.file_loaded = True
+        st.session_state.current_file = uploaded_file.name
+        st.session_state.dwg_loaded = True
+        st.session_state.analysis_results = {}
+        st.session_state.analysis_complete = False
+        
+        st.success(f"Successfully loaded {len(zones)} zones from '{uploaded_file.name}'")
+        return zones
 
     except Exception as e:
         st.error(f"File loading error: {str(e)}")
-        return None
+        # Emergency fallback
+        zones = RobustErrorHandler.create_default_zones("fallback", "Emergency fallback")
+        st.session_state.zones = zones
+        st.session_state.file_loaded = True
+        st.session_state.current_file = "Emergency Layout"
+        st.warning("Using emergency layout for demonstration")
+        return zones
 
 
 def load_sample_file(sample_path, selected_sample):
@@ -1720,27 +1679,14 @@ def generate_cad_export(components):
 def main():
     """Main application function with full advanced features"""
 
-    # Initialize navigation manager with error handling
+    # Initialize navigation manager with better error handling
     try:
         from src.navigation_manager import NavigationManager
         nav_manager = NavigationManager()
     except Exception as e:
-        logger.warning(f"Navigation manager failed to initialize: {e}")
-        # Create minimal navigation fallback
-        class BasicNavigation:
-            def display_navigation_header(self): 
-                st.title("🏗️ AI Architectural Space Analyzer PRO")
-            def display_workflow_progress(self): pass
-            def display_action_buttons(self): return None
-            def display_sidebar_navigation(self): return None
-            def display_breadcrumb(self): pass
-            def get_navigation_state(self): return 'upload'
-            def update_navigation_state(self, state): pass
-            def start_new_analysis(self): 
-                for key in ['zones', 'analysis_results', 'file_loaded', 'dwg_loaded', 'analysis_complete']:
-                    if key in st.session_state:
-                        del st.session_state[key]
-        nav_manager = BasicNavigation()
+        st.error(f"Navigation system error: {e}")
+        st.info("Refreshing the page may resolve this issue.")
+        st.stop()
 
     # Display navigation header
     nav_manager.display_navigation_header()
