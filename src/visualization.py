@@ -27,8 +27,8 @@ class PlanVisualizer:
                 )
                 return fig
 
-            for i, zone in enumerate(zones):
-                try:
+        for i, zone in enumerate(zones):
+            try:
                 # Handle different point formats more robustly
                 points = zone.get('points', [])
                 if not points:
@@ -104,7 +104,7 @@ class PlanVisualizer:
                 )
                 return fig
 
-            # Color mapping for room types
+        # Color mapping for room types
         color_map = {
             'Office': 'lightblue',
             'Conference Room': 'lightgreen', 
