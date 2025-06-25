@@ -29,62 +29,51 @@ class PlanVisualizer:
 
             for i, zone in enumerate(zones):
                 try:
-                    # Handle different point formats more robustly
-                    points = zone.get('points', [])
-                    if not points:
-                        continue
-
-                    x_coords = []
-                    y_coords = []
-
-                    # Handle various point formats
-                    if isinstance(points, list) and len(points) > 0:
-                        if isinstance(points[0], (list, tuple)) and len(points[0]) >= 2:
-                            # Format: [(x1, y1), (x2, y2), ...]
-                            x_coords = [p[0] for p in points]
-                            y_coords = [p[1] for p in points]
-                        elif len(points) >= 2 and isinstance(points[0], list):
-                            # Format: [[x1, x2, ...], [y1, y2, ...]]
-                            x_coords = points[0] if points[0] else []
-                            y_coords = points[1] if len(points) > 1 and points[1] else []
-                        elif isinstance(points[0], (int, float)):
-                            # Format: [x1, y1, x2, y2, ...]
-                            if len(points) >= 4:
-                                x_coords = points[::2]
-                                y_coords = points[1::2]
-
-                    if len(x_coords) >= 3 and len(y_coords) >= 3:
-                        # Close the polygon
-                        if x_coords[-1] != x_coords[0] or y_coords[-1] != y_coords[0]:
-                            x_coords.append(x_coords[0])
-                            y_coords.append(y_coords[0])
-
-                        fig.add_trace(
-                            go.Scatter(
-                                x=x_coords,
-                                y=y_coords,
-                                fill="toself",
-                                mode='lines',
-                                name=f"Zone {zone.get('id', i)}",
-                                line=dict(width=2),
-                                fillcolor=f'rgba({50 + i*30 % 200}, {100 + i*25 % 150}, {150 + i*20 % 100}, 0.3)',
-                                hovertemplate=f"<b>Zone {i}</b><br>Type: {zone.get('zone_type', 'Unknown')}<br>Area: {zone.get('area', 0):.1f} m²<extra></extra>"
-                            )
-                        )
-                except Exception as e:
-                    st.warning(f"Could not display zone {i}: {str(e)}")
+                # Handle different point formats more robustly
+                points = zone.get('points', [])
+                if not points:
                     continue
 
-        except Exception as e:
-            st.error(f"Error creating plot: {str(e)}")
-            # Return empty figure on error
-            fig = go.Figure()
-            fig.update_layout(
-                title="Error creating visualization",
-                width=800,
-                height=400
-            )
-            return fig
+                x_coords = []
+                y_coords = []
+
+                # Handle various point formats
+                if isinstance(points, list) and len(points) > 0:
+                    if isinstance(points[0], (list, tuple)) and len(points[0]) >= 2:
+                        # Format: [(x1, y1), (x2, y2), ...]
+                        x_coords = [p[0] for p in points]
+                        y_coords = [p[1] for p in points]
+                    elif len(points) >= 2 and isinstance(points[0], list):
+                        # Format: [[x1, x2, ...], [y1, y2, ...]]
+                        x_coords = points[0] if points[0] else []
+                        y_coords = points[1] if len(points) > 1 and points[1] else []
+                    elif isinstance(points[0], (int, float)):
+                        # Format: [x1, y1, x2, y2, ...]
+                        if len(points) >= 4:
+                            x_coords = points[::2]
+                            y_coords = points[1::2]
+
+                if len(x_coords) >= 3 and len(y_coords) >= 3:
+                    # Close the polygon
+                    if x_coords[-1] != x_coords[0] or y_coords[-1] != y_coords[0]:
+                        x_coords.append(x_coords[0])
+                        y_coords.append(y_coords[0])
+
+                    fig.add_trace(
+                        go.Scatter(
+                            x=x_coords,
+                            y=y_coords,
+                            fill="toself",
+                            mode='lines',
+                            name=f"Zone {zone.get('id', i)}",
+                            line=dict(width=2),
+                            fillcolor=f'rgba({50 + i*30 % 200}, {100 + i*25 % 150}, {150 + i*20 % 100}, 0.3)',
+                            hovertemplate=f"<b>Zone {i}</b><br>Type: {zone.get('zone_type', 'Unknown')}<br>Area: {zone.get('area', 0):.1f} m²<extra></extra>"
+                        )
+                    )
+            except Exception as e:
+                st.warning(f"Could not display zone {i}: {str(e)}")
+                continue
 
         fig.update_layout(
             title="Floor Plan Visualization",
