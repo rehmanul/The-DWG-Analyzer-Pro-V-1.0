@@ -22,11 +22,11 @@ args = "pkill -f streamlit || true"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "sleep 2"
+args = "sleep 1"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS true --server.enableXsrfProtection false --server.enableWebsocketCompression false --server.maxUploadSize 200"
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true --server.enableCORS true --server.enableXsrfProtection false --server.maxUploadSize 200 --server.maxMessageSize 200"
 
 [[ports]]
 localPort = 5000

@@ -157,21 +157,17 @@ class FloorPlan:
 
 
 # Configure page
-try:
-    st.set_page_config(
-        page_title="AI Architectural Space Analyzer PRO",
-        page_icon="🏗️",
-        layout="wide",
-        initial_sidebar_state="expanded",
-        menu_items={
-            'Get Help': None,
-            'Report a bug': None,
-            'About': "# AI Architectural Space Analyzer PRO\nEnterprise-grade architectural drawing analysis with AI-powered insights"
-        }
-    )
-except Exception as e:
-    # Page config already set, continue
-    pass
+st.set_page_config(
+    page_title="AI Architectural Space Analyzer PRO",
+    page_icon="🏗️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': "# AI Architectural Space Analyzer PRO\nEnterprise-grade architectural drawing analysis with AI-powered insights"
+    }
+)
 
 
 # Performance optimization
@@ -2100,45 +2096,32 @@ def display_plan_visualization():
         st.info("Load a DWG file to see visualization")
         return
 
-    try:
-        visualizer = PlanVisualizer()
+    visualizer = PlanVisualizer()
 
-        # Visualization options
-        col1, col2 = st.columns([3, 1])
+    # Visualization options
+    col1, col2 = st.columns([3, 1])
 
-        with col2:
-            st.subheader("🎨 Display Options")
-            show_zones = st.checkbox("Show Zones", value=True, key="plan_viz_display_zones")
-            show_boxes = st.checkbox("Show Box Placements", value=True, key="plan_viz_display_boxes") 
-            show_labels = st.checkbox("Show Labels", value=True, key="plan_viz_display_labels")
-            color_by_type = st.checkbox("Color by Room Type", value=True, key="plan_viz_display_color")
+    with col2:
+        st.subheader("🎨 Display Options")
+        show_zones = st.checkbox("Show Zones", value=True, key="plan_viz_display_zones")
+        show_boxes = st.checkbox("Show Box Placements", value=True, key="plan_viz_display_boxes") 
+        show_labels = st.checkbox("Show Labels", value=True, key="plan_viz_display_labels")
+        color_by_type = st.checkbox("Color by Room Type", value=True, key="plan_viz_display_color")
 
-        with col1:
-            # Generate visualization
-            try:
-                if st.session_state.analysis_results:
-                    fig = visualizer.create_interactive_plot(
-                        st.session_state.zones,
-                        st.session_state.analysis_results,
-                        show_zones=show_zones,
-                        show_boxes=show_boxes,
-                        show_labels=show_labels,
-                        color_by_type=color_by_type)
-                else:
-                    fig = visualizer.create_basic_plot(st.session_state.zones)
+    with col1:
+        # Generate visualization
+        if st.session_state.analysis_results:
+            fig = visualizer.create_interactive_plot(
+                st.session_state.zones,
+                st.session_state.analysis_results,
+                show_zones=show_zones,
+                show_boxes=show_boxes,
+                show_labels=show_labels,
+                color_by_type=color_by_type)
+        else:
+            fig = visualizer.create_basic_plot(st.session_state.zones)
 
-                if fig:
-                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.error("Could not generate visualization")
-                    
-            except Exception as viz_error:
-                st.error(f"Visualization error: {str(viz_error)}")
-                st.info("Try refreshing the page or reloading your file")
-                
-    except Exception as e:
-        st.error(f"Error in visualization setup: {str(e)}")
-        st.info("Please restart the application")
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def display_statistics():
