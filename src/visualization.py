@@ -75,6 +75,17 @@ class PlanVisualizer:
                     st.warning(f"Could not display zone {i}: {str(e)}")
                     continue
 
+        except Exception as e:
+            st.error(f"Error creating plot: {str(e)}")
+            # Return empty figure on error
+            fig = go.Figure()
+            fig.update_layout(
+                title="Error creating visualization",
+                width=800,
+                height=400
+            )
+            return fig
+
         fig.update_layout(
             title="Floor Plan Visualization",
             xaxis_title="X Coordinate (m)",
