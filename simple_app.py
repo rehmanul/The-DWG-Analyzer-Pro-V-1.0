@@ -70,7 +70,7 @@ def load_and_analyze_dwg(uploaded_file):
                 os.unlink(tmp_file_path)
                 
     except Exception as e:
-        st.error(f"Error: {str(e)}")
+        st.error(f"Error: {str(e)}")}")
 
 def main():
     st.title("📐 DWG Analyzer - Real Analysis Tool")
