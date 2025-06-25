@@ -15,11 +15,17 @@ class PlanVisualizer:
 
     def create_basic_plot(self, zones):
         """Create basic 2D plot of zones"""
-        fig = go.Figure()
+        try:
+            fig = go.Figure()
 
-        if not zones:
-            fig.update_layout(title="No zones to display")
-            return fig
+            if not zones:
+                fig.update_layout(
+                    title="No zones to display",
+                    width=800,
+                    height=400,
+                    showlegend=False
+                )
+                return fig
 
         for i, zone in enumerate(zones):
             try:
@@ -86,11 +92,17 @@ class PlanVisualizer:
     def create_interactive_plot(self, zones, analysis_results, show_zones=True, 
                               show_boxes=True, show_labels=True, color_by_type=True):
         """Create interactive plot with analysis results"""
-        fig = go.Figure()
+        try:
+            fig = go.Figure()
 
-        if not zones:
-            fig.update_layout(title="No zones to display")
-            return fig
+            if not zones:
+                fig.update_layout(
+                    title="No zones to display",
+                    width=800,
+                    height=400,
+                    showlegend=False
+                )
+                return fig
 
         # Color mapping for room types
         color_map = {
