@@ -951,9 +951,9 @@ def display_enhanced_visualization(components):
     with col1:
         view_mode = st.selectbox("View Mode", ["2D Plan", "3D Isometric"])
     with col2:
-        show_furniture = st.checkbox("Show Furniture", value=True, key="viz_show_furniture")
+        show_furniture = st.checkbox("Show Furniture", value=True, key="enhanced_viz_furniture")
     with col3:
-        show_annotations = st.checkbox("Show Annotations", value=True, key="viz_show_annotations")
+        show_annotations = st.checkbox("Show Annotations", value=True, key="enhanced_viz_annotations")
 
     # Generate visualization based on mode
     if view_mode == "3D Isometric" and st.session_state.analysis_results:
@@ -2103,10 +2103,10 @@ def display_plan_visualization():
 
     with col2:
         st.subheader("🎨 Display Options")
-        show_zones = st.checkbox("Show Zones", value=True, key="plan_viz_zones_display")
-        show_boxes = st.checkbox("Show Box Placements", value=True, key="plan_viz_boxes_display") 
-        show_labels = st.checkbox("Show Labels", value=True, key="plan_viz_labels_display")
-        color_by_type = st.checkbox("Color by Room Type", value=True, key="plan_viz_color_display")
+        show_zones = st.checkbox("Show Zones", value=True, key="plan_visualization_zones")
+        show_boxes = st.checkbox("Show Box Placements", value=True, key="plan_visualization_boxes") 
+        show_labels = st.checkbox("Show Labels", value=True, key="plan_visualization_labels")
+        color_by_type = st.checkbox("Color by Room Type", value=True, key="plan_visualization_color")
 
     with col1:
         # Generate visualization
